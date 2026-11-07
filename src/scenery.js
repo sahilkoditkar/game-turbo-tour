@@ -80,10 +80,16 @@ export function buildScenery(track, quality = 'high') {
       const s = track.samples[i];
       for (const sd of [-1, 1]) {
         const r = rand();
-        const off = s.wall + 3 + rand() * 9;
-        const x = s.p.x + s.n.x * sd * off + (rand() - 0.5) * 6, z = s.p.z + s.n.z * sd * off + (rand() - 0.5) * 6;
-        if (r < 0.32) { if (ok(x, z, track.wallOffset + 6)) roadside.push([x, z, 0.85 + rand() * 0.55, rand() * Math.PI * 2, hAt(x, z)]); }
-        else if (r < 0.62) { if (ok(x, z, track.wallOffset + 1.5)) under.push([x, z, 0.8 + rand() * 0.9, rand() * Math.PI * 2, hAt(x, z)]); }
+        const tree = r < 0.36;
+        if (!tree && r > 0.7) continue;
+        // trees stand clear of the wall (crowns may lean over it); bushes and rocks can sit right behind it
+        const off = s.wall + (tree ? 6.5 : 2.5) + rand() * 9;
+        const x = s.p.x + s.n.x * sd * off, z = s.p.z + s.n.z * sd * off;
+        const near = track.nearestGlobal(x, z);
+        const wall = track.samples[near.idx]?.wall ?? track.wallOffset;
+        if (near.dist < wall + (tree ? 5.5 : 1.8)) continue;   // too close to another part of the track
+        if (th.water !== null && z > b.maxZ + 60) continue;
+        (tree ? roadside : under).push([x, z, (tree ? 0.85 : 0.8) + rand() * (tree ? 0.55 : 0.9), rand() * Math.PI * 2, hAt(x, z)]);
       }
     }
     addVegetation(g, th.biome, positions.concat(roadside), highQ, 'trees');

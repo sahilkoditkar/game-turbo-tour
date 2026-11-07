@@ -34,7 +34,7 @@ const SKY_FRAG = /* glsl */`
   void main() {
     vec3 d = normalize(vDir);
     float h = d.y;
-    vec3 c = mix(uHorizon, uTop, pow(clamp(h, 0.0, 1.0), 0.5));
+    vec3 c = mix(uHorizon, uTop, pow(smoothstep(0.0, 0.34, h), 0.7));
     c = mix(c, uGlow, exp(-max(h, 0.0) * 9.0) * uGlowAmt * step(0.0, h));
     if (h < 0.0) c = uHorizon;
     // sun: a crisp disc with a soft halo
@@ -47,7 +47,7 @@ const SKY_FRAG = /* glsl */`
     if (uClouds > 0.0 && h > 0.0) {
       vec2 uv = d.xz / (h + 0.1) * 1.3;
       float n = fbm(uv);
-      float edge = 1.0 - uClouds * 0.55;
+      float edge = 0.66 - uClouds * 0.22;
       float m = smoothstep(edge, edge + 0.015, n) * smoothstep(0.015, 0.09, h);
       float lit = smoothstep(edge + 0.04, edge + 0.06, fbm(uv + vec2(0.0, 0.06)));
       vec3 cc = mix(uCloudShade, uCloud, max(lit, 0.35 * smoothstep(edge + 0.08, edge + 0.2, n)));
@@ -150,7 +150,7 @@ class RingBuilder {
     else this.win.push(-1, 0, -1, 0, -1, 0);
   }
   /** Colour at the base of a shape: mostly horizon haze. */
-  base(c, haze = 0.85) { return c.clone().lerp(this.horizon, haze); }
+  base(c, haze = 0.7) { return c.clone().lerp(this.horizon, haze); }
   build() {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
@@ -291,27 +291,27 @@ export function buildBackdrop(scene, th, o = {}) {
     return THREE.MathUtils.smoothstep(d, 0.5, 1.2) * 0.9 + 0.1;
   };
   if (kind === 'meadow') {
-    mountains(rb, rand, { r: 2250, base, count: 34, hMin: 240, hMax: 470, wMin: 0.09, wMax: 0.16, color: 0x6f8fd0, haze: 0.45, snow: 0.3 });
-    mountains(rb, rand, { r: 2080, base, count: 40, hMin: 130, hMax: 240, wMin: 0.1, wMax: 0.18, color: 0x3f9a62, haze: 0.28 });
-    treeLine(rb, rand, { r: 1880, base, hill: 120, color: 0x58ad46, tree: 0x2f8a3a, haze: 0.12, step: 0.018 });
+    mountains(rb, rand, { r: 2250, base, count: 34, hMin: 240, hMax: 470, wMin: 0.09, wMax: 0.16, color: 0x6f8fd0, haze: 0.27, snow: 0.3 });
+    mountains(rb, rand, { r: 2080, base, count: 40, hMin: 130, hMax: 240, wMin: 0.1, wMax: 0.18, color: 0x3f9a62, haze: 0.17 });
+    treeLine(rb, rand, { r: 1880, base, hill: 120, color: 0x58ad46, tree: 0x2f8a3a, haze: 0.07, step: 0.018 });
   } else if (kind === 'coast') {
-    mountains(rb, rand, { r: 2250, base, count: 30, hMin: 200, hMax: 400, wMin: 0.1, wMax: 0.18, color: 0x7aa0d6, haze: 0.5, arc });
-    hills(rb, rand, { r: 1900, base, hill: 130, color: 0x5aac58, haze: 0.18, arc });
+    mountains(rb, rand, { r: 2250, base, count: 30, hMin: 200, hMax: 400, wMin: 0.1, wMax: 0.18, color: 0x7aa0d6, haze: 0.3, arc });
+    hills(rb, rand, { r: 1900, base, hill: 130, color: 0x5aac58, haze: 0.11, arc });
   } else if (kind === 'desert') {
-    mesas(rb, rand, { r: 2250, base, count: 40, hMin: 160, hMax: 300, color: 0xd9845a, haze: 0.5 });
-    mesas(rb, rand, { r: 2050, base, count: 34, hMin: 120, hMax: 230, color: 0xc0582f, haze: 0.22 });
-    hills(rb, rand, { r: 1880, base, hill: 105, color: 0xe2b066, haze: 0.15 });
+    mesas(rb, rand, { r: 2250, base, count: 40, hMin: 160, hMax: 300, color: 0xd9845a, haze: 0.3 });
+    mesas(rb, rand, { r: 2050, base, count: 34, hMin: 120, hMax: 230, color: 0xc0582f, haze: 0.13 });
+    hills(rb, rand, { r: 1880, base, hill: 105, color: 0xe2b066, haze: 0.09 });
   } else if (kind === 'forest') {
-    mountains(rb, rand, { r: 2250, base, count: 32, hMin: 300, hMax: 560, wMin: 0.08, wMax: 0.14, color: 0x6a8ccc, haze: 0.42, snow: 0.34 });
-    mountains(rb, rand, { r: 2080, base, count: 40, hMin: 150, hMax: 280, wMin: 0.09, wMax: 0.16, color: 0x2f8a58, haze: 0.25 });
-    treeLine(rb, rand, { r: 1880, base, hill: 115, color: 0x2f8a46, tree: 0x1d6a38, haze: 0.1, step: 0.011 });
+    mountains(rb, rand, { r: 2250, base, count: 32, hMin: 300, hMax: 560, wMin: 0.08, wMax: 0.14, color: 0x6a8ccc, haze: 0.25, snow: 0.34 });
+    mountains(rb, rand, { r: 2080, base, count: 40, hMin: 150, hMax: 280, wMin: 0.09, wMax: 0.16, color: 0x2f8a58, haze: 0.15 });
+    treeLine(rb, rand, { r: 1880, base, hill: 115, color: 0x2f8a46, tree: 0x1d6a38, haze: 0.06, step: 0.011 });
   } else if (kind === 'alpine') {
-    mountains(rb, rand, { r: 2250, base, count: 30, hMin: 380, hMax: 680, wMin: 0.08, wMax: 0.14, color: 0x6d8fd4, haze: 0.35, snow: 0.55 });
-    mountains(rb, rand, { r: 2080, base, count: 36, hMin: 200, hMax: 360, wMin: 0.08, wMax: 0.15, color: 0x8aa6d8, haze: 0.2, snow: 0.45 });
-    treeLine(rb, rand, { r: 1880, base, hill: 110, color: 0xdfe9f5, tree: 0x1d6a42, haze: 0.08, step: 0.012 });
+    mountains(rb, rand, { r: 2250, base, count: 30, hMin: 380, hMax: 680, wMin: 0.08, wMax: 0.14, color: 0x6d8fd4, haze: 0.21, snow: 0.55 });
+    mountains(rb, rand, { r: 2080, base, count: 36, hMin: 200, hMax: 360, wMin: 0.08, wMax: 0.15, color: 0x8aa6d8, haze: 0.12, snow: 0.45 });
+    treeLine(rb, rand, { r: 1880, base, hill: 110, color: 0xdfe9f5, tree: 0x1d6a42, haze: 0.05, step: 0.012 });
   } else if (kind === 'city') {
-    mountains(rb, rand, { r: 2250, base, count: 28, hMin: 200, hMax: 380, wMin: 0.1, wMax: 0.2, color: 0x2a1a52, haze: 0.35 });
-    skyline(rb, rand, { r: 1850, base, color: 0x1c1640, haze: 0.08 });
+    mountains(rb, rand, { r: 2250, base, count: 28, hMin: 200, hMax: 380, wMin: 0.1, wMax: 0.2, color: 0x2a1a52, haze: 0.21 });
+    skyline(rb, rand, { r: 1850, base, color: 0x1c1640, haze: 0.05 });
   }
   const mat = new THREE.ShaderMaterial({ vertexShader: RIDGE_VERT, fragmentShader: RIDGE_FRAG, vertexColors: true, fog: false, side: THREE.DoubleSide });
   const mesh = new THREE.Mesh(rb.build(), mat);

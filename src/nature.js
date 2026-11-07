@@ -8,7 +8,7 @@ import * as THREE from 'three';
 const shared = (o) => { o.userData.shared = true; return o; };
 let MAT = null;
 function material() {
-  if (!MAT) MAT = shared(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  if (!MAT) MAT = shared(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95, metalness: 0 }));
   return MAT;
 }
 
@@ -104,8 +104,8 @@ const C = {
   trunk: 0x8f4a26, trunkDark: 0x6e3a20, palmTrunk: 0xb98a58, palmTrunkTop: 0xd6ab73,
   pine: 0x1f8a4c, pineTop: 0x47c46d, pineDeep: 0x17703f, pineDeepTop: 0x2fa356,
   green: 0x3fae35, greenTop: 0x8ade3c, autumn: 0xe0611f, autumnTop: 0xffa531, gold: 0xe8a90f, goldTop: 0xffde3d,
-  blossom: 0xf27aa8, blossomTop: 0xffc2db, frond: 0x26a046, frondTip: 0x7bdc4a,
-  cactus: 0x2f9a48, cactusTop: 0x5cc65a,
+  blossom: 0xf0508f, blossomTop: 0xff9cc6, frond: 0x26a046, frondTip: 0x7bdc4a,
+  cactus: 0x2a8a40, cactusTop: 0x48ad4c,
 };
 
 /** Species geometries, built on first use. */
@@ -203,7 +203,7 @@ function species(name) {
 const TREES = {
   forest: [['spirePine', 0.45], ['stackPine', 0.35], ['roundGreen', 0.2]],
   alpine: [['spirePine', 0.5], ['stackPine', 0.5]],
-  meadow: [['roundGreen', 0.42], ['roundAutumn', 0.16], ['roundGold', 0.1], ['roundBlossom', 0.1], ['spirePine', 0.22]],
+  meadow: [['roundGreen', 0.46], ['roundAutumn', 0.16], ['roundGold', 0.1], ['roundBlossom', 0.06], ['spirePine', 0.22]],
   park: [['roundGreen', 0.55], ['roundBlossom', 0.3], ['roundGold', 0.15]],
   coast: [['palm', 0.78], ['roundGreen', 0.22]],
   desert: [['saguaro', 1]],
