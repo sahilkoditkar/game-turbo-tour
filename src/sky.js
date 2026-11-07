@@ -10,13 +10,9 @@ const SUN_AZ = Math.atan2(80, 120); // same compass direction as the shadow-cast
 
 const NOISE = /* glsl */`
   float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
-  float vnoise(vec2 p) {
-    vec2 i = floor(p), f = fract(p);
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(mix(h21(i), h21(i + vec2(1, 0)), u.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), u.x), u.y);
-  }
-  float fbm(vec2 p) { float a = 0.5, s = 0.0; for (int i = 0; i < 4; i++) { s += a * vnoise(p); p = p * 2.03 + 17.1; a *= 0.5; } return s; }
 `;
+
+const MAX_CLOUDS = 24, PUFFS = 5;
 
 const SKY_VERT = /* glsl */`
   varying vec3 vDir;
@@ -28,7 +24,10 @@ const SKY_VERT = /* glsl */`
 
 const SKY_FRAG = /* glsl */`
   uniform vec3 uTop, uHorizon, uGlow, uSunColor, uSunDir, uCloud, uCloudShade;
-  uniform float uGlowAmt, uSunSize, uClouds, uStars;
+  uniform float uGlowAmt, uSunSize, uStars;
+  uniform int uCloudN;
+  uniform vec4 uCloudC[${MAX_CLOUDS}];          // azimuth, elevation, bounding radius, flat base (cloud-local y)
+  uniform vec4 uPuff[${MAX_CLOUDS * PUFFS}];   // puff centre x, y, radius, rotation (cloud-local, radians)
   varying vec3 vDir;
   ${NOISE}
   void main() {
@@ -43,15 +42,37 @@ const SKY_FRAG = /* glsl */`
       c += uSunColor * (pow(max(sd, 0.0), 10.0) * 0.28 + pow(max(sd, 0.0), 160.0) * 0.45);
       c = mix(c, uSunColor * 1.6 + 0.4, smoothstep(uSunSize, uSunSize + 0.0006, sd));
     }
-    // flat cartoon clouds on a plane above the world, two-tone with a shaded underside
-    if (uClouds > 0.0 && h > 0.0) {
-      vec2 uv = d.xz / (h + 0.1) * 1.3;
-      float n = fbm(uv);
-      float edge = 0.66 - uClouds * 0.22;
-      float m = smoothstep(edge, edge + 0.015, n) * smoothstep(0.015, 0.09, h);
-      float lit = smoothstep(edge + 0.04, edge + 0.06, fbm(uv + vec2(0.0, 0.06)));
-      vec3 cc = mix(uCloudShade, uCloud, max(lit, 0.35 * smoothstep(edge + 0.08, edge + 0.2, n)));
-      c = mix(c, cc, m);
+    // low-poly clouds: each is a few faceted puffs (seven-sided) with a flat base,
+    // lit on top and shaded underneath, drawn in its own tangent plane on the sky
+    const float SEG = 6.2831853 / 7.0;
+    for (int i = 0; i < ${MAX_CLOUDS}; i++) {
+      if (i >= uCloudN) break;
+      vec4 cl = uCloudC[i];
+      float ca = cos(cl.x), sa = sin(cl.x), ce = cos(cl.y), se = sin(cl.y);
+      float fwd = dot(d, vec3(ce * ca, se, ce * sa));
+      if (fwd < 0.9) continue;
+      vec2 q = vec2(dot(d, vec3(-sa, 0.0, ca)), dot(d, vec3(-se * ca, ce, -se * sa))) / fwd;
+      if (dot(q, q) > cl.z * cl.z || q.y < cl.w) continue;
+      float tone = -1.0;
+      for (int j = 0; j < ${PUFFS}; j++) {
+        vec4 pf = uPuff[i * ${PUFFS} + j];
+        if (pf.z <= 0.0) continue;
+        vec2 p = q - pf.xy;
+        float len = length(p);
+        if (len > pf.z) continue;
+        float ang = mod(atan(p.y, p.x) - pf.w, 6.2831853);
+        float sec = floor(ang / SEG);
+        float rp = pf.z * cos(0.5 * SEG) / cos(ang - (sec + 0.5) * SEG);
+        if (len > rp) continue;
+        float mid = (sec + 0.5) * SEG + pf.w;
+        // inner face lit; the ring of facets around it shaded by which way it faces
+        tone = len < rp * 0.56 ? 1.0 : clamp(0.42 + 0.62 * dot(vec2(cos(mid), sin(mid)), vec2(-0.34, 0.94)), 0.0, 1.0);
+      }
+      if (tone >= 0.0) {
+        tone = min(tone, 1.0 - 0.6 * smoothstep(cl.w + cl.z * 0.3, cl.w, q.y));   // darker towards the flat base
+        vec3 cc = mix(uCloudShade, uCloud, tone);
+        c = mix(cc, uHorizon, 0.3 * (1.0 - smoothstep(0.03, 0.25, cl.y)));       // low clouds sit in the haze
+      }
     }
     // stars
     if (uStars > 0.0 && h > 0.05) {
@@ -97,8 +118,34 @@ const RIDGE_FRAG = /* glsl */`
     #include <colorspace_fragment>
   }`;
 
+/**
+ * Scatter clouds round the sky: each is a cluster of faceted puffs with a flat base,
+ * smaller and hazier towards the horizon. `cover` 0..1 sets how many.
+ */
+function makeClouds(cover, seed) {
+  const rand = mulberry32(seed);
+  const n = Math.min(MAX_CLOUDS, Math.round(cover * 46));
+  const c = [], p = [];
+  for (let i = 0; i < MAX_CLOUDS; i++) c.push(new THREE.Vector4());
+  for (let i = 0; i < MAX_CLOUDS * PUFFS; i++) p.push(new THREE.Vector4());
+  for (let i = 0; i < n; i++) {
+    const el = 0.04 + Math.pow(rand(), 1.8) * 0.24;   // keep them low: high ones stretch at the screen corners
+    const az = (i / n) * Math.PI * 2 + rand() * (Math.PI * 2 / n);
+    const s = (0.04 + rand() * 0.055) * (0.75 + el * 1.5);     // half-width, radians
+    const shape = [[0, 0.16, 0.5], [-0.52, 0, 0.36], [0.56, 0.02, 0.34], [-0.16, 0.44, 0.32], [0.26, 0.36, 0.3]];
+    const count = 3 + Math.floor(rand() * 3);
+    for (let j = 0; j < count; j++) {
+      const [x, y, r] = shape[j];
+      p[i * PUFFS + j].set((x + (rand() - 0.5) * 0.14) * s, (y + (rand() - 0.5) * 0.1) * s, r * (0.88 + rand() * 0.28) * s, rand() * 6.283);
+    }
+    c[i].set(az, el, 1.25 * s, -0.12 * s);
+  }
+  return { n, c, p };
+}
+
 /** Sky dome for a theme. Sets the scene fog colour to the sky's horizon. */
-export function buildSky(scene, th) {
+export function buildSky(scene, th, seed = 99) {
+  const clouds = makeClouds(th.night ? 0 : (th.clouds ?? 0), seed);
   const elev = THREE.MathUtils.degToRad(th.sunElev ?? 14);
   const sunDir = new THREE.Vector3(Math.cos(SUN_AZ) * Math.cos(elev), Math.sin(elev), Math.sin(SUN_AZ) * Math.cos(elev));
   const mat = new THREE.ShaderMaterial({
@@ -111,9 +158,9 @@ export function buildSky(scene, th) {
       uSunColor: { value: new THREE.Color(th.sunColor ?? 0xfff3c4) },
       uSunDir: { value: sunDir },
       uSunSize: { value: th.night ? 0 : Math.cos(THREE.MathUtils.degToRad(th.sunSize ?? 2.4)) },
-      uClouds: { value: th.clouds ?? 0 },
+      uCloudN: { value: clouds.n }, uCloudC: { value: clouds.c }, uPuff: { value: clouds.p },
       uCloud: { value: new THREE.Color(th.cloudColor ?? 0xffffff) },
-      uCloudShade: { value: new THREE.Color(th.cloudShade ?? 0xd6e6f5) },
+      uCloudShade: { value: new THREE.Color(th.cloudShade ?? 0x98b4de) },
       uStars: { value: th.night ? 0.9 : 0 },
     },
     depthWrite: false, fog: false, side: THREE.BackSide,
