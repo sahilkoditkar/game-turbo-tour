@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { addVegetation } from './nature.js';
 
 // Deterministic pseudo-random so the scenery is the same every time.
 function mulberry32(a) {
@@ -57,21 +58,36 @@ export function buildScenery(track, quality = 'high') {
 
   const farFromTrack = (x, z, margin) => track.nearestGlobal(x, z).dist > margin;
 
-  // Trees / cacti / pines
-  if (th.trees !== 'none') {
+  // Trees, bushes and boulders: scattered over the land, plus a band along the
+  // roadside where they frame the view
+  if (th.biome) {
     const area = (extent + 500) * (extent + 500) / (1500 * 1500);
     const count = Math.round(Math.min(1600, Math.max(200, (highQ ? 420 : 160) * area)));
+    const ok = (x, z, margin) => farFromTrack(x, z, margin) && !(th.water !== null && z > b.maxZ + 60);
     const positions = [];
     let tries = 0;
     while (positions.length < count && tries < count * 20) {
       tries++;
       const x = cx + (rand() - 0.5) * (extent + 500);
       const z = cz + (rand() - 0.5) * (extent + 500);
-      if (!farFromTrack(x, z, track.wallOffset + 6 + rand() * 12)) continue;
-      if (th.water !== null && z > b.maxZ + 60) continue;
-      positions.push([x, z, 0.7 + rand() * 0.8, rand() * Math.PI * 2, hAt(x, z)]);
+      if (!ok(x, z, track.wallOffset + 7 + rand() * 12)) continue;
+      positions.push([x, z, 0.8 + rand() * 0.6, rand() * Math.PI * 2, hAt(x, z)]);
     }
-    addTrees(g, th.trees, positions, highQ);
+    // roadside: every few metres pick a side and plant just beyond the wall
+    const roadside = [], under = [];
+    const every = highQ ? 9 : 16;
+    for (let i = 0; i < track.count; i += every) {
+      const s = track.samples[i];
+      for (const sd of [-1, 1]) {
+        const r = rand();
+        const off = s.wall + 3 + rand() * 9;
+        const x = s.p.x + s.n.x * sd * off + (rand() - 0.5) * 6, z = s.p.z + s.n.z * sd * off + (rand() - 0.5) * 6;
+        if (r < 0.32) { if (ok(x, z, track.wallOffset + 6)) roadside.push([x, z, 0.85 + rand() * 0.55, rand() * Math.PI * 2, hAt(x, z)]); }
+        else if (r < 0.62) { if (ok(x, z, track.wallOffset + 1.5)) under.push([x, z, 0.8 + rand() * 0.9, rand() * Math.PI * 2, hAt(x, z)]); }
+      }
+    }
+    addVegetation(g, th.biome, positions.concat(roadside), highQ, 'trees');
+    addVegetation(g, th.biome, under, highQ, 'under');
   }
 
   // Buildings for city theme
@@ -89,30 +105,6 @@ export function buildScenery(track, quality = 'high') {
     }
     addBuildings(g, boxes, rand);
     addStreetLights(g, track, highQ);
-  }
-
-  // Mountains ring
-  const mountainMat = new THREE.MeshStandardMaterial({ color: th.mountains, roughness: 1, flatShading: true });
-  // Ring the mountains around the track's bounding circle so long stages never run through them.
-  const boundR = Math.hypot(b.maxX - b.minX, b.maxZ - b.minZ) / 2;
-  const mCount = Math.round(26 + boundR / 120);
-  for (let i = 0; i < mCount; i++) {
-    const a = (i / mCount) * Math.PI * 2 + rand() * 0.2;
-    const coneR = 220 + rand() * 180;
-    const r = boundR + coneR + 350 + rand() * 400;
-    const h = 180 + rand() * 260;
-    const m = new THREE.Mesh(new THREE.ConeGeometry(coneR, h, 6 + Math.floor(rand() * 3)), mountainMat);
-    const base = Math.min(0, track.minHeight) - 25;
-    m.position.set(cx + Math.cos(a) * r, base + h / 2, cz + Math.sin(a) * r);
-    m.rotation.y = rand() * Math.PI;
-    g.add(m);
-    if (th.trees === 'pine' || th.trees === 'round') {
-      // snow caps
-      const cap = new THREE.Mesh(new THREE.ConeGeometry(70 + rand() * 40, h * 0.3, 6), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }));
-      cap.position.set(m.position.x, base + h - h * 0.15, m.position.z);
-      cap.rotation.y = m.rotation.y;
-      g.add(cap);
-    }
   }
 
   // Grandstand near start line
@@ -137,48 +129,6 @@ export function buildScenery(track, quality = 'high') {
   }
 
   return g;
-}
-
-export function addTrees(g, kind, positions, highQ) {
-  let trunkGeo, leafGeo, trunkColor, leafColor, leafY, trunkY;
-  if (kind === 'pine') {
-    trunkGeo = new THREE.CylinderGeometry(0.35, 0.6, 3, 6);
-    leafGeo = new THREE.ConeGeometry(3.2, 9, 7);
-    trunkColor = 0x5a3b22; leafColor = 0x1f5b2f; trunkY = 1.5; leafY = 6.5;
-  } else if (kind === 'cactus') {
-    trunkGeo = new THREE.CylinderGeometry(0.7, 0.9, 6, 7);
-    leafGeo = new THREE.CylinderGeometry(0.45, 0.5, 3, 6);
-    trunkColor = 0x3f7f3a; leafColor = 0x3f7f3a; trunkY = 3; leafY = 4.5;
-  } else if (kind === 'palm') {
-    trunkGeo = new THREE.CylinderGeometry(0.35, 0.55, 9, 6);
-    leafGeo = new THREE.ConeGeometry(4.5, 2.4, 7);
-    trunkColor = 0x8a6a45; leafColor = 0x2e8b3a; trunkY = 4.5; leafY = 9.6;
-  } else {
-    trunkGeo = new THREE.CylinderGeometry(0.4, 0.6, 3.5, 6);
-    leafGeo = new THREE.IcosahedronGeometry(3.6, 1);
-    trunkColor = 0x5c3f24; leafColor = 0x2f7d32; trunkY = 1.75; leafY = 5.6;
-  }
-  const trunks = new THREE.InstancedMesh(trunkGeo, new THREE.MeshStandardMaterial({ color: trunkColor, roughness: 1 }), positions.length);
-  const leaves = new THREE.InstancedMesh(leafGeo, new THREE.MeshStandardMaterial({ color: leafColor, roughness: 1, flatShading: true }), positions.length);
-  const m = new THREE.Matrix4();
-  const q = new THREE.Quaternion();
-  const col = new THREE.Color();
-  positions.forEach(([x, z, sc, rot, y = 0], i) => {
-    q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rot);
-    m.compose(new THREE.Vector3(x, y + trunkY * sc - 0.3, z), q, new THREE.Vector3(sc, sc, sc));
-    trunks.setMatrixAt(i, m);
-    if (kind === 'cactus') {
-      const q2 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2 * 0.9);
-      m.compose(new THREE.Vector3(x + Math.cos(rot) * 1.4 * sc, y + leafY * sc, z + Math.sin(rot) * 1.4 * sc), q.multiply(q2), new THREE.Vector3(sc, sc, sc));
-    } else {
-      m.compose(new THREE.Vector3(x, y + leafY * sc, z), q, new THREE.Vector3(sc, sc, sc));
-    }
-    leaves.setMatrixAt(i, m);
-    col.set(leafColor).offsetHSL((Math.sin(i * 12.9898) * 43758.5453 % 1) * 0.03, 0, ((i * 7) % 10) / 10 * 0.12 - 0.06);
-    leaves.setColorAt(i, col);
-  });
-  trunks.castShadow = highQ; leaves.castShadow = highQ;
-  g.add(trunks, leaves);
 }
 
 function addBuildings(g, boxes, rand) {
