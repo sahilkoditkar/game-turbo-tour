@@ -18,6 +18,7 @@ const DRIFT = {
   yawDamp: 1.2,   // yaw-rate damping (1/s)
   align: 1,       // restoring yaw toward the velocity direction (rad/s^2 per rad of slip)
   assist: 0.7,    // counter-steer assist: fraction of the front slip the fronts follow by themselves
+  hold: 5,        // while a drift is held: pull toward the target drift angle (rad/s^2 per rad)
 };
 
 export class Car {
@@ -149,8 +150,13 @@ export class Car {
     const handbrake = inp.handbrake && v > 2;
     const slipV = Math.abs(this.vr);
     const hookSlip = (maxLat / grip) * 1.3 + 0.8;               // lateral speed the tyres can carry without letting go
+    // Holding a drift: handbrake, or a driver steering into the slide with the throttle on.
+    // AI cars always recover instead, so one can never get stuck in an endless slide.
+    const intoSlide = inp.steer * -Math.sign(this.vr) > 0.25;
+    const holding = handbrake || (this.isPlayer && !this.autopilot && intoSlide && inp.throttle > 0.2);
     let slideT = 0;
     if (handbrake) slideT = 1;
+    else if (this.slide > 0.05 && holding && v > 8) slideT = 1;            // a drift lasts as long as it is held
     else if (this.slide > 0.05 && slipV > hookSlip && v > 4) slideT = 1;  // keep sliding until hooked up
     else if (slipV > hookSlip * 2.5 && v > 6) slideT = 1;               // spun by an impact / overload
     if (this.spinTime > 0) { this.spinTime -= dt; slideT = 1; }          // knocked loose by another car
@@ -199,10 +205,27 @@ export class Car {
     const beta = Math.atan2(this.vr, vFwd);
     const yawAccD = (A * FF - B * FR) / K2 - yaw0 * P.yawDamp + beta * P.align;
 
+    // What the slide does depends on the driver. Holding a drift (handbrake, or steering into
+    // the slide on the throttle) runs the tyre model above, whose restoring forces keep the
+    // angle steady. Knocked loose by a hit, the car spins freely and the spin dies away with
+    // friction. Otherwise (steering released or counter-steering) the car is recovering: it
+    // turns only as the steering asks and its velocity swings round to where the nose points,
+    // so it drives off the way it is facing instead of the nose swinging back to the old line.
+    // While held, the slip angle is drawn toward a natural drift angle (~17 deg at full lock),
+    // so even a quick handbrake flick turns into a proper drift instead of fizzling out.
+    let yawSlide, vrSlide;
+    if (this.spinTime > 0) { yawSlide = -yaw0 * 2.5 * dt; vrSlide = -this.vr * (1 - Math.exp(-1.5 * dt)); }
+    else if (holding) {
+      const betaT = -Math.sign(inp.steer) * 0.3 * Math.min(1, Math.abs(inp.steer));
+      yawSlide = (yawAccD + (handbrake ? 0 : P.hold * (beta - betaT))) * dt;
+      vrSlide = latAccD * dt;
+    }
+    else { yawSlide = (yawK - yaw0) * Math.min(1, dt * 8); vrSlide = -this.vr * (1 - Math.exp(-3.2 * dt)); }
+
     // Blend regimes. Grip: yaw snaps to the kinematic value and lateral velocity decays.
-    this.yawRate += (yawK - this.yawRate) * (1 - sl) * Math.min(1, dt * 30) + sl * yawAccD * dt;
+    this.yawRate += (yawK - this.yawRate) * (1 - sl) * Math.min(1, dt * 30) + sl * yawSlide;
     this.vr *= Math.exp(-grip * (1 - sl) * dt);
-    this.vr += sl * latAccD * dt;
+    this.vr += sl * vrSlide;
     // Sliding tyres scrub speed: the rear drags, and the fronts when they are heavily slipped.
     this.vf -= Math.sign(this.vf) * Math.min(v, sl * (Math.abs(FR) * 0.18 + Math.abs(FF) * Math.abs(Math.sin(alphaF)) * 0.5) * dt);
     const yaw = this.yawRate;
@@ -242,11 +265,12 @@ export class Car {
         this.vf = this.vel.x * fx + this.vel.z * fz;
         this.vr = this.vel.x * rx + this.vel.z * rz;
         this.vf *= 0.85;
-        // nudge heading toward track direction so cars don't grind along walls
+        // On a glancing scrape, nudge the heading toward the track so cars don't grind along
+        // the wall. A real hit (steeper than ~25 deg) keeps whatever angle it left the car at.
         let d = samp.heading - this.heading;
         while (d > Math.PI) d -= Math.PI * 2;
         while (d < -Math.PI) d += Math.PI * 2;
-        this.heading += d * Math.min(0.5, this.wallHit * 0.03);
+        if (Math.abs(d) < 0.45) this.heading += d * Math.min(0.5, this.wallHit * 0.03);
       }
     }
 
