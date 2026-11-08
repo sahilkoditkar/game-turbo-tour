@@ -25,15 +25,15 @@
 /** Mass (kg) and half-footprint (m) per body shape; traffic carries a driver and passengers. */
 const SPEC = {
   classic: { m: 1250, hl: 2.2, hw: 0.9 },
-  hatch: { m: 1300, hl: 2.1, hw: 0.9 },
   muscle: { m: 1500, hl: 2.35, hw: 0.92 },
-  gt: { m: 1450, hl: 2.25, hw: 0.95 },
   rally: { m: 1280, hl: 2.05, hw: 0.92 },
   groupb: { m: 1150, hl: 2.1, hw: 0.94 },
   super: { m: 1450, hl: 2.25, hw: 0.97 },
-  proto: { m: 1050, hl: 2.5, hw: 1.0 },
-  hyper: { m: 1950, hl: 2.27, hw: 1.0 },
   formula: { m: 800, hl: 2.8, hw: 1.0 },
+  pony: { m: 1750, hl: 2.42, hw: 0.96 },
+  mamba: { m: 1540, hl: 2.25, hw: 0.96 },
+  kaze: { m: 1370, hl: 2.2, hw: 0.905 },
+  v12: { m: 1230, hl: 2.24, hw: 0.99 },
 };
 const DEFAULT = { m: 1350, hl: 2.2, hw: 0.93 };
 const MU = 0.35;            // body panel on body panel

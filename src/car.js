@@ -26,7 +26,7 @@ export class Car {
    * @param {string} o.name
    * @param {number} o.color
    * @param {object} o.stats   effective stats {maxSpeed, accel, grip, turn, brake}
-   * @param {string} o.shape   model id from carmodels.js (e.g. 'hatch', 'super', 'formula')
+   * @param {string} o.shape   model id from carmodels.js (e.g. 'classic', 'super', 'formula')
    * @param {boolean} o.isPlayer
    * @param {number} o.playerIndex
    * @param {string} [o.quality] 'high' | 'low' mesh detail
@@ -35,7 +35,7 @@ export class Car {
     this.name = o.name;
     this.color = o.color;
     this.stats = o.stats;
-    this.shape = o.shape || 'hatch';
+    this.shape = o.shape || 'classic';
     this.isPlayer = !!o.isPlayer;
     this.playerIndex = o.playerIndex ?? -1;
     this.aiSkill = o.aiSkill ?? 1;

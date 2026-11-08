@@ -2,16 +2,10 @@
 
 export const CARS = [
   {
-    id: 'classic', name: 'Retro 62 Roadster', price: 3500,
-    desc: 'Long-bonnet 1960s roadster modelled on the Jaguar E-Type: wire wheels, covered headlamps, open cockpit. Slow but sweet-handling, and cheap.',
-    stats: { maxSpeed: 50, accel: 13, grip: 6.6, turn: 1.08, brake: 32 },
+    id: 'classic', name: 'Retro 62 Roadster', price: 0,
+    desc: 'Long-bonnet 1960s roadster modelled on the Jaguar E-Type: wire wheels, covered headlamps, open cockpit. Your first car: forgiving, sweet-handling and cheap to upgrade.',
+    stats: { maxSpeed: 58, accel: 16, grip: 6.8, turn: 1.04, brake: 36 },
     shape: 'classic',
-  },
-  {
-    id: 'hatch', name: 'Vento Hatch', price: 0,
-    desc: 'Front-drive hot hatch modelled on the VW Golf GTI, red grille pinstripe and all. Forgiving and cheap to upgrade.',
-    stats: { maxSpeed: 58, accel: 16, grip: 6.8, turn: 1.0, brake: 36 },
-    shape: 'hatch',
   },
   {
     id: 'muscle', name: 'Thunder V8', price: 9000,
@@ -20,10 +14,10 @@ export const CARS = [
     shape: 'muscle',
   },
   {
-    id: 'gt', name: 'Strada GT', price: 14000,
-    desc: 'Rear-engined track car modelled on the Porsche 911 GT3 RS, swan-neck wing included. Big power, needs a steady hand.',
-    stats: { maxSpeed: 70, accel: 20, grip: 7.6, turn: 1.04, brake: 40 },
-    shape: 'gt',
+    id: 'hornet', name: 'Hornet SS', price: 16000,
+    desc: 'Modern V8 pony car modelled on the Chevrolet Camaro SS: angry black nose band, SS bonnet bulge, chopped roof, bold twin stripes.',
+    stats: { maxSpeed: 71, accel: 22, grip: 7.0, turn: 1.0, brake: 40 },
+    shape: 'pony',
   },
   {
     id: 'rally', name: 'Gravel King', price: 19000,
@@ -38,28 +32,28 @@ export const CARS = [
     shape: 'groupb',
   },
   {
+    id: 'mamba', name: 'Mamba GTS', price: 24000,
+    desc: 'Front-engine V10 coupe modelled on the Dodge Viper GTS: endless bonnet, double-bubble roof, side pipes and twin stripes. Brutal, and a handful.',
+    stats: { maxSpeed: 75, accel: 25, grip: 7.6, turn: 1.0, brake: 42 },
+    shape: 'mamba',
+  },
+  {
     id: 'super', name: 'Vortex S9', price: 26000,
     desc: 'Mid-engine V10 wedge modelled on the Lamborghini Huracán EVO. Sharp, balanced, and very fast.',
     stats: { maxSpeed: 76, accel: 24, grip: 8.4, turn: 1.08, brake: 44 },
     shape: 'super',
   },
   {
-    id: 'fiamma', name: 'Fiamma V12', price: 36000,
+    id: 'kaze', name: 'Kaze R1', price: 30000,
+    desc: 'Mid-engine V6 coupe modelled on the original Honda NSX: pop-up lamps, glass canopy, full-width tail lights. Light, precise and easy to drive fast.',
+    stats: { maxSpeed: 74, accel: 22, grip: 8.4, turn: 1.12, brake: 44 },
+    shape: 'kaze',
+  },
+  {
+    id: 'fiamma', name: 'Fiamma V12', price: 40000,
     desc: 'Mid-engine V12 targa modelled on the Ferrari F50: covered headlamps, twin bonnet vents, a full-width wing growing out of the rear wings.',
     stats: { maxSpeed: 79, accel: 25, grip: 8.5, turn: 1.08, brake: 45 },
     shape: 'v12',
-  },
-  {
-    id: 'proto', name: 'Nightfall LMP', price: 32000,
-    desc: 'Le Mans Hypercar-class prototype in the mould of the Toyota GR010 and Porsche 963. Massive downforce, giant wing.',
-    stats: { maxSpeed: 78, accel: 23, grip: 8.8, turn: 1.1, brake: 46 },
-    shape: 'proto',
-  },
-  {
-    id: 'hyper', name: 'Halo Hypercar', price: 48000,
-    desc: 'Quad-turbo W16 hypercar modelled on the Bugatti Chiron: horseshoe grille, polished C-line. The fastest thing with number plates.',
-    stats: { maxSpeed: 86, accel: 27, grip: 9.2, turn: 1.12, brake: 48 },
-    shape: 'hyper',
   },
   {
     id: 'formula', name: 'Turbo F1', price: 60000,
@@ -68,6 +62,17 @@ export const CARS = [
     shape: 'formula',
   },
 ];
+
+/**
+ * Cars that left the roster, with the car a save that owned one is given instead and the
+ * price refunded when it already owns that one (see career.loadProfile).
+ */
+export const RETIRED_CARS = {
+  hatch: { to: 'classic', price: 0 },
+  gt: { to: 'hornet', price: 14000 },
+  proto: { to: 'fiamma', price: 32000 },
+  hyper: { to: 'fiamma', price: 48000 },
+};
 
 export const UPGRADES = [
   { id: 'engine', name: 'Engine', desc: '+top speed, +acceleration', maxLevel: 5 },

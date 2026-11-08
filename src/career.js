@@ -1,4 +1,4 @@
-import { CARS, SERIES, UPGRADES, AI_DRIVERS, AI_COLORS, POINTS, upgradeCost, effectiveStats, getCar, getSeries } from './data.js';
+import { CARS, SERIES, UPGRADES, AI_DRIVERS, AI_COLORS, POINTS, RETIRED_CARS, upgradeCost, effectiveStats, getCar, getSeries } from './data.js';
 import { levelForXp } from './worlddef.js';
 
 const KEY = 'turbotour.save.v1';
@@ -6,8 +6,8 @@ const OLD_KEY = 'apexrush.save.v1'; // pre-rename save, migrated once on load
 
 export function defaultProfile() {
   return {
-    name: 'You', money: 5000, cars: ['hatch'], selected: 'hatch', colorIndex: 0,
-    upgrades: { hatch: { engine: 0, tires: 0, brakes: 0, aero: 0 } },
+    name: 'You', money: 5000, cars: ['classic'], selected: 'classic', colorIndex: 0,
+    upgrades: { classic: { engine: 0, tires: 0, brakes: 0, aero: 0 } },
     series: {}, stats: { races: 0, wins: 0, podiums: 0, earned: 0 },
     bestLaps: {},
     settings: { quality: 'high', volume: 0.7, sound: true, p1Control: 'wasd', p2Control: 'arrows' },
@@ -36,8 +36,31 @@ export function loadProfile() {
     const d = defaultProfile();
     const hz = { ...d.horizon, ...(p.horizon || {}) };
     hz.stats = { ...d.horizon.stats, ...(hz.stats || {}) };
-    return { ...d, ...p, settings: { ...d.settings, ...(p.settings || {}) }, stats: { ...d.stats, ...(p.stats || {}) }, horizon: hz };
+    return migrateCars({ ...d, ...p, settings: { ...d.settings, ...(p.settings || {}) }, stats: { ...d.stats, ...(p.stats || {}) }, horizon: hz });
   } catch (e) { return defaultProfile(); }
+}
+
+/**
+ * Swap cars that left the roster for their replacements: the replacement takes over the
+ * retired car's upgrades and selection; if the save already has it, the retired car's
+ * price is refunded instead.
+ */
+function migrateCars(p) {
+  const owned = [];
+  for (const id of p.cars || []) {
+    const r = RETIRED_CARS[id];
+    if (!r) { if (!owned.includes(id) && CARS.some(c => c.id === id)) owned.push(id); continue; }
+    if (owned.includes(r.to) || (p.cars || []).includes(r.to)) p.money += r.price;
+    else { owned.push(r.to); if (p.upgrades && p.upgrades[id] && !p.upgrades[r.to]) p.upgrades[r.to] = p.upgrades[id]; }
+    if (p.upgrades) delete p.upgrades[id];
+  }
+  if (!owned.length) owned.push(CARS[0].id);
+  p.cars = owned;
+  if (RETIRED_CARS[p.selected]) p.selected = RETIRED_CARS[p.selected].to;
+  if (!owned.includes(p.selected)) p.selected = owned[0];
+  p.upgrades = p.upgrades || {};
+  for (const id of owned) p.upgrades[id] = p.upgrades[id] || { engine: 0, tires: 0, brakes: 0, aero: 0 };
+  return p;
 }
 
 export function saveProfile(p) {
@@ -108,7 +131,7 @@ export function standings(profile, seriesId) {
 
 /** Build the AI field for a series (consistent across its events). */
 export function seriesField(series) {
-  const tierCar = ['hatch', 'gt', 'proto', 'formula'][series.tier - 1] || 'formula';
+  const tierCar = ['classic', 'hornet', 'fiamma', 'formula'][series.tier - 1] || 'formula';
   const lvl = Math.min(5, series.tier - 1);
   const baseStats = effectiveStats(getCar(tierCar), { engine: lvl, tires: lvl, brakes: lvl, aero: lvl });
   return AI_DRIVERS.slice(0, series.aiCount).map((d, i) => {

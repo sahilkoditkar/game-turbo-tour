@@ -264,7 +264,7 @@ export class PropKit {
 
   _showroomCars(group, p) {
     const cs = Math.cos(p.rot), sn = Math.sin(p.rot);
-    [['super', 0xff2d55, -11, 0.6], ['hyper', 0x38bdf8, 0, -0.5], ['muscle', 0xffd23f, 11, 0.8]].forEach(([shape, color, lz, yaw]) => {
+    [['v12', 0xd2141e, -11, 0.6], ['mamba', 0x1f4fd1, 0, -0.5], ['pony', 0xffc61a, 11, 0.8]].forEach(([shape, color, lz, yaw]) => {
       const car = buildCarMesh(shape, color, this.highQ ? 'high' : 'low');
       // the model's geometry belongs to a shared template: never free it with the chunk
       car.traverse(m => { if (m.geometry) m.geometry.userData.shared = true; if (m.material) for (const mm of [].concat(m.material)) mm.userData.shared = true; });
