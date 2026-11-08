@@ -399,6 +399,22 @@ export function mergeByMaterial(parent) {
 
 const role = (m, r) => { m.userData.role = r; return m; };
 let SHARED = null;
+
+/** Soft round glow sprite (white core fading out) for lamp halos. */
+function glowTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const x = c.getContext('2d');
+  const g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.25, 'rgba(255,255,255,0.75)');
+  g.addColorStop(0.6, 'rgba(255,255,255,0.18)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 /** Materials shared by every car. Per-car roles (paint, accent, …) are placeholders swapped per instance. */
 export function sharedMaterials() {
   if (SHARED) return SHARED;
@@ -410,6 +426,8 @@ export function sharedMaterials() {
     accent: role(P(0xffffff), 'accent'),
     accent2: role(P(0xffffff), 'accent2'),
     tail: role(E(0x3a0000, 0xff1a1a, 0.8), 'tail'),
+    // additive halo in front of the tail lamps; its opacity follows the brakes like the lamps
+    glow: role(new THREE.MeshBasicMaterial({ map: glowTexture(), color: 0xff2412, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }), 'glow'),
     plate: role(S(0xffffff, { transparent: true, roughness: 0.4 }), 'plate'),
     num: role(S(0xffffff, { transparent: true, roughness: 0.4, polygonOffset: true, polygonOffsetFactor: -2 }), 'num'),
     carbon: P(0x1c1d21, { roughness: 0.4, metalness: 0.4, clearcoatRoughness: 0.35, envMapIntensity: 0.6 }),
@@ -418,6 +436,7 @@ export function sharedMaterials() {
     grille: S(0x060607, { roughness: 0.95, metalness: 0.0, side: THREE.DoubleSide }),
     chrome: S(0xeef0f4, { roughness: 0.06, metalness: 1.0 }),
     alu: S(0xc3c7ce, { roughness: 0.22, metalness: 1.0 }),
+    brightChrome: S(0xf6f8fb, { roughness: 0.12, metalness: 0.92 }),
     gunmetal: S(0x3a3d44, { roughness: 0.3, metalness: 0.9 }),
     blackRim: S(0x17181b, { roughness: 0.35, metalness: 0.6 }),
     gold: S(0xc8a24a, { roughness: 0.28, metalness: 1.0 }),
@@ -460,6 +479,7 @@ export class Kit {
     this.shell.position.y = -PIVOT;
     this.body.add(this.shell);
     this.wheelGroups = [];
+    this.style = null;   // 'arcade': bold paint, bright glowing lamps (see carmodels instanceMaterials)
   }
 
   mesh(geo, mat, parent = this.shell) {
@@ -532,6 +552,17 @@ export class Kit {
     m.position.set(x, y, z);
     if (tilt) { if (axis === 'y') m.rotation.x = tilt; else m.rotation.z = tilt; }
     m.userData.keep = true; m.castShadow = false;
+    return m;
+  }
+  /** Glow halo: a soft additive sprite on a vertical plane at z, facing rear (-1) or front (+1). */
+  glow(x, y, z, w, h, facing = -1) {
+    const g = new THREE.PlaneGeometry(w, h);
+    if (facing < 0) g.rotateY(Math.PI);
+    const m = new THREE.Mesh(g, this.M.glow);
+    m.position.set(x, y, z + facing * 0.03);
+    m.userData.keep = true;   // keeps its UVs (merging drops them)
+    m.renderOrder = 2;
+    this.shell.add(m);
     return m;
   }
   /** Flattened dome (lens, lamp) sitting on a loft surface, facing along its normal. */
@@ -689,6 +720,7 @@ export class Kit {
 
   finish() {
     mergeByMaterial(this.shell);
+    this.root.userData.style = this.style;
     return this.root;
   }
 }

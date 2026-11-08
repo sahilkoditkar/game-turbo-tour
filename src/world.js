@@ -90,6 +90,13 @@ export function mulberry32(a) {
   };
 }
 
+/**
+ * Wide arcade roads: country roads become four lanes, lanes and city streets get room
+ * for two proper lanes, dirt trails a little more; the highways are already wide.
+ */
+const ROAD_WIDEN = { highway: 1, road: 1.3, lane: 1.3, street: 1.15, dirt: 1.15 };
+function widened(def) { return { ...def, width: +(def.width * (ROAD_WIDEN[def.kind] ?? 1)).toFixed(2) }; }
+
 export class World {
   constructor() {
     // A daytime theme for the shared systems (fx, lights). Ground colours per region are in horizon.js.
@@ -192,7 +199,7 @@ export class World {
    * short of it or overshooting.
    */
   _snapEndpoints() {
-    const sampled = ROADS.map(def => ({ def, pts: sampleSpline(def.points, SPACING * 2, !def.closed, def.straight) }));
+    const sampled = ROADS.map(def => ({ def: widened(def), pts: sampleSpline(def.points, SPACING * 2, !def.closed, def.straight) }));
     const SNAP = 230, EDGE = WORLD_HALF - 120;
     const RANK = { highway: 4, road: 3, street: 2, lane: 1, dirt: 0 };
     return sampled.map(({ def, pts }, ri) => {

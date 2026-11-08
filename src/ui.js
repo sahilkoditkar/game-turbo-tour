@@ -166,8 +166,8 @@ export class UI {
     const st = app.setup = app.setup || {
       trackId: 'sunrise', laps: 3, aiCount: 5, difficulty: 1,
       players: [
-        { name: 'Player 1', carId: 'hatch', colorIndex: 0, control: p.settings.p1Control || 'wasd' },
-        { name: 'Player 2', carId: 'gt', colorIndex: 1, control: p.settings.p2Control || 'arrows' },
+        { name: 'Player 1', carId: 'classic', colorIndex: 0, control: p.settings.p1Control || 'wasd' },
+        { name: 'Player 2', carId: 'hornet', colorIndex: 1, control: p.settings.p2Control || 'arrows' },
       ],
     };
     st.mode = mode;

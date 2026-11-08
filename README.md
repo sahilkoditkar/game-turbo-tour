@@ -13,7 +13,7 @@ website, so it is hosted directly on GitHub Pages (or any static host).
 
 - Open-world free roam: a 6 km island with a city, villages, highways and gravel trails
 - 16 circuits (including Silverstone-, Monza- and Spa-inspired layouts) and 4 point-to-point stages
-- 10 cars, from a hot hatch to a hypercar and an F1 car, with upgrades and paint
+- 12 cars, from a 1960s roadster, a 90s Japanese GT and V8 muscle to supercars, a hypercar and an F1 car, with upgrades and paint
 - Split-screen 2-player racing on one keyboard or two gamepads
 - Drifting, crash physics, dynamic AI, championships and a time trial ghost car
 - Plays in the browser on PC and mobile; progress saves locally
@@ -67,10 +67,11 @@ website, so it is hosted directly on GitHub Pages (or any static host).
 - Four point-to-point stages (6–10 km): a 390 m mountain hillclimb, a coastal highway run, a
   desert dune crossing and a narrow forest rally stage. Single run from start to finish, with
   elevation, varying width, a finish gantry and barriers at both ends.
-- Ten cars, each modelled on a real car's dimensions and signature details: a Jaguar E-Type-style
-  roadster, a Golf GTI-style hot hatch, a '67 Mustang-style fastback, a 911 GT3 RS-style track car,
-  a GR Yaris Rally1-style gravel car, an Audi quattro S1-style Group B car, a Huracán-style
-  supercar, a Le Mans Hypercar prototype, a Chiron-style hypercar and a 2022-rules F1 car. Bodies
+- Twelve cars, each modelled on a real car's dimensions and signature details: a Jaguar
+  E-Type-style roadster (the starter), a Supra Mk4-style 90s GT, a '67 Mustang-style fastback, a
+  Camaro SS-style pony car, a GR Yaris Rally1-style gravel car, an Audi quattro S1-style Group B
+  car, a Viper GTS-style V10 coupe, a Huracán-style supercar, an NSX-style mid-engine coupe, an
+  F50-style V12 supercar, a McLaren F1-style central-seat hypercar and a 2022-rules F1 car. Bodies
   are smooth procedural lofts with real wheel-arch openings, surface-hugging lights, glass and
   liveries, and wheels with brake discs and calipers. Race cars carry per-car numbers and livery
   colours. Open `showroom.html` to inspect every car up close.

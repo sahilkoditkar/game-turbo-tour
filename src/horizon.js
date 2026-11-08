@@ -6,7 +6,8 @@ import { World, fbm, smoothstep, mulberry32, coastDist } from './world.js';
 import { Car } from './car.js';
 import { DriftFx } from './fx.js';
 import { buildSun, aimSun, buildEnvironment, updateChaseCamera, snapChaseCamera } from './scenekit.js';
-import { addTrees } from './scenery.js';
+import { buildSky } from './sky.js';
+import { addTrees, addVegetation } from './nature.js';
 import { HorizonHUD } from './horizonhud.js';
 import { Traffic } from './traffic.js';
 import { PropKit, mergeByMaterial } from './props.js';
@@ -39,8 +40,8 @@ export class Horizon {
     this.world = new World();
     this.scene = new THREE.Scene();
     const th = this.world.theme;
-    this.scene.background = new THREE.Color(th.sky);
     this.scene.fog = new THREE.Fog(th.fog, 300, 1900);
+    buildSky(this.scene, th);
     this.sun = buildSun(this.scene, th, this.highQ, 100);
     this.envTex = buildEnvironment(this.renderer, th);
     this.scene.environment = this.envTex;
@@ -439,24 +440,30 @@ export class Horizon {
     const cityPad = CITY_OUTSKIRTS + CHUNK / 2 + 30;   // any chunk that can hold a city building
     const inCity = x0 > CITY.x0 - cityPad && x0 < CITY.x1 + cityPad && z0 > CITY.z0 - cityPad && z0 < CITY.z1 + cityPad;
 
-    // Trees
+    // Trees, then bushes and boulders (denser near the roads, where they frame the view)
     const region = W.regionAt(x0, z0).id;
-    const density = { forest: 0.0011, grass: 0.00016, alpine: 0.00035, coast: 0.00022, desert: 0.00014, city: 0 }[region] || 0;
-    const kind = { forest: 'pine', grass: 'round', alpine: 'pine', coast: 'palm', desert: 'cactus' }[region];
-    if (density > 0 && kind && coastDist(x0, z0) > -CHUNK) {
-      const count = Math.round(density * CHUNK * CHUNK * (this.highQ ? 1 : 0.55));
-      const positions = [];
-      for (let t = 0; t < count * 3 && positions.length < count; t++) {
-        const x = x0 + (rand() - 0.5) * CHUNK, z = z0 + (rand() - 0.5) * CHUNK;
-        if (coastDist(x, z) < 45) continue;
-        if (x > CITY.x0 - 90 && x < CITY.x1 + 90 && z > CITY.z0 - 90 && z < CITY.z1 + 90) continue;
-        const near = W.nearestGlobal(x, z, 1);
-        if (near.idx >= 0 && near.dist < W.samples[near.idx].hw + 5.5) continue;
-        const h = W.terrainHeight(x, z);
-        if (region === 'alpine' && h > 190) continue;  // above the tree line
-        positions.push([x, z, 0.7 + rand() * 0.8, rand() * Math.PI * 2, h]);
-      }
-      if (positions.length) addTrees(group, kind, positions, this.highQ);
+    const density = { forest: 0.0011, grass: 0.00022, alpine: 0.00035, coast: 0.00026, desert: 0.00014, city: 0 }[region] || 0;
+    const biome = { forest: 'forest', grass: 'meadow', alpine: 'alpine', coast: 'coast', desert: 'desert' }[region];
+    if (density > 0 && biome && coastDist(x0, z0) > -CHUNK) {
+      const spot = (count, clearance, scale) => {
+        const out = [];
+        for (let t = 0; t < count * 3 && out.length < count; t++) {
+          const x = x0 + (rand() - 0.5) * CHUNK, z = z0 + (rand() - 0.5) * CHUNK;
+          if (coastDist(x, z) < 45) continue;
+          if (x > CITY.x0 - 90 && x < CITY.x1 + 90 && z > CITY.z0 - 90 && z < CITY.z1 + 90) continue;
+          const near = W.nearestGlobal(x, z, 1);
+          if (near.idx >= 0 && near.dist < W.samples[near.idx].hw + clearance) continue;
+          const h = W.terrainHeight(x, z);
+          if (region === 'alpine' && h > 190) continue;  // above the tree line
+          out.push([x, z, scale[0] + rand() * scale[1], rand() * Math.PI * 2, h]);
+        }
+        return out;
+      };
+      const q = this.highQ ? 1 : 0.55;
+      const trees = spot(Math.round(density * CHUNK * CHUNK * q), 6.5, [0.75, 0.6]);
+      if (trees.length) addVegetation(group, biome, trees, this.highQ, 'trees');
+      const under = spot(Math.round(Math.max(6, density * CHUNK * CHUNK * 0.6) * q), 3.5, [0.7, 0.9]);
+      if (under.length) addVegetation(group, biome, under, this.highQ, 'under');
     }
 
     // City blocks: buildings on lots between the streets
@@ -515,7 +522,7 @@ export class Horizon {
         trees.push([x, z, 0.8 + ((k * 37) % 10) / 25, a, W.terrainHeight(x, z)]);
       }
     }
-    if (trees.length) addTrees(chunk.group, 'round', trees, this.highQ);
+    if (trees.length) addTrees(chunk.group, 'park', trees, this.highQ);
   }
 
   // ------------------------------------------------------------ Game loop
@@ -1025,15 +1032,15 @@ function makeWorldRoadTexture(kind, width) {
   for (let i = 0; i < img.data.length; i += 4) { const n = (Math.random() - 0.5) * (kind === 'dirt' ? 40 : 26); img.data[i] += n; img.data[i + 1] += n; img.data[i + 2] += n; }
   ctx.putImageData(img, 0, 0);
   if (kind !== 'dirt' && kind !== 'pad') {
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.fillRect(5, 0, 4, 256); ctx.fillRect(247, 0, 4, 256);
-    if (kind === 'highway') {
-      ctx.fillStyle = 'rgba(255,210,60,0.9)'; ctx.fillRect(126, 0, 4, 256);
-      ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(62, 0, 3, 110); ctx.fillRect(190, 0, 3, 110);
-    } else if (kind === 'street') {
-      ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(126, 0, 4, 90);
-    } else if (kind === 'road') {
-      ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(126, 0, 4, 110);
+    // bold markings: solid edge lines; highways and main roads have four lanes (solid yellow
+    // centre, dashed white dividers), streets and lanes two (dashed white centre)
+    ctx.fillStyle = 'rgba(255,255,255,0.88)';
+    ctx.fillRect(5, 0, 6, 256); ctx.fillRect(245, 0, 6, 256);
+    if (kind === 'highway' || kind === 'road') {
+      ctx.fillStyle = 'rgba(255,205,40,0.95)'; ctx.fillRect(125, 0, 6, 256);
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(65, 0, 5, 96); ctx.fillRect(186, 0, 5, 96);
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(125, 0, 6, 96);
     }
   }
   const tex = new THREE.CanvasTexture(c);
