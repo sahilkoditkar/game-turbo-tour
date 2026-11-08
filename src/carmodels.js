@@ -212,84 +212,80 @@ MODELS.hatch = (k) => {
 /* ================================================================ Muscle car
  * Modelled on the 1967 Ford Mustang fastback (restomod stance): 4.61 m long, 1.79 m wide. */
 MODELS.muscle = (k) => {
-  // Arcade proportions: wide and low, broad hips over big wheels pushed out to the
-  // body edge, a narrow chopped cabin set inside wide shoulders, short overhangs.
   const M = k.M;
   k.style = 'arcade';
-  const W = { fz: 1.45, rz: -1.25, fr: 0.37, rr: 0.385, fx: 0.80, rx: 0.82, fw: 0.28, rw: 0.33 };
+  const W = { fz: 1.47, rz: -1.27, fr: 0.345, rr: 0.355, fx: 0.745, rx: 0.745, fw: 0.26, rw: 0.3 };
   const body = k.loft([
-    [-2.12, 0.78, 0.38, 0.70, 0.90, 4.5],
-    [-2.07, 0.89, 0.31, 0.70, 0.94, 4.5, 0.03],
-    [-1.88, 0.96, 0.25, 0.70, 0.985, 4.5, 0.08],
-    [-1.25, 0.995, 0.23, 0.69, 1.0, 4.5, 0.12],
-    [-0.62, 0.955, 0.22, 0.68, 0.985, 5, 0.06],
-    [0.40, 0.94, 0.22, 0.68, 0.965, 5, 0.05],
-    [1.45, 0.965, 0.23, 0.69, 0.965, 4.5, 0.12],
-    [2.12, 0.935, 0.27, 0.68, 0.925, 4.5, 0.07],
-    [2.31, 0.89, 0.31, 0.67, 0.895, 4.5, 0.02],
-    [2.38, 0.82, 0.34, 0.65, 0.86, 4.5],
+    [-2.16, 0.80, 0.40, 0.72, 0.93, 6],
+    [-2.12, 0.87, 0.34, 0.70, 0.955, 6],
+    [-1.90, 0.89, 0.28, 0.68, 0.965, 6],
+    [-1.27, 0.895, 0.25, 0.67, 0.975, 6, 0.01],
+    [-0.30, 0.885, 0.24, 0.67, 0.96, 6],
+    [0.70, 0.885, 0.24, 0.67, 0.95, 6],
+    [1.47, 0.89, 0.25, 0.68, 0.93, 6, 0.02],
+    [2.25, 0.87, 0.29, 0.67, 0.91, 6, 0.02],
+    [2.40, 0.85, 0.32, 0.66, 0.90, 6],
+    [2.45, 0.79, 0.34, 0.64, 0.88, 6],
   ], {
-    arches: [k.arch(W.fz, W.fr, W.fx, W.fw, 0.03), k.arch(W.rz, W.rr, W.rx, W.rw, 0.03)],
-    dents: [{ z0: -0.72, z1: -0.34, y0: 0.48, y1: 0.64, depth: 0.05, s: 0.03 }],
+    arches: [k.arch(W.fz, W.fr, W.fx, W.fw, 0.05), k.arch(W.rz, W.rr, W.rx, W.rw, 0.05)],
+    dents: [{ z0: -0.72, z1: -0.34, y0: 0.5, y1: 0.66, depth: 0.05, s: 0.03 }],
   });
   k.skin(body, M.paint);
-  archLips(k, body, M.paint, 0.022);
+  archLips(k, body, M.paint, 0.014);
   const cab = k.loft([
-    [-1.95, 0.60, 0.85, 0.95, 0.975, 3],
-    [-1.55, 0.635, 0.85, 0.965, 1.05, 3.2],
-    [-0.85, 0.665, 0.85, 0.975, 1.19, 3.6],
-    [-0.35, 0.675, 0.85, 0.975, 1.225, 3.6],
-    [0.10, 0.685, 0.85, 0.975, 1.225, 3.6],
-    [0.42, 0.705, 0.85, 0.975, 1.12, 3.6],
-    [0.72, 0.725, 0.85, 0.97, 0.965, 3.6],
-    [0.76, 0.705, 0.85, 0.965, 0.96, 3.6],
+    [-2.0, 0.60, 0.85, 0.94, 0.965, 3],
+    [-1.6, 0.66, 0.85, 0.96, 1.08, 3.2],
+    [-0.8, 0.70, 0.85, 0.98, 1.26, 3.5],
+    [-0.3, 0.71, 0.85, 0.98, 1.31, 3.5],
+    [0.15, 0.72, 0.85, 0.98, 1.31, 3.5],
+    [0.45, 0.74, 0.85, 0.97, 1.17, 3.5],
+    [0.72, 0.76, 0.85, 0.96, 0.955, 3.5],
+    [0.76, 0.74, 0.85, 0.955, 0.95, 3.5],
   ], { n: 32, kb: 22, ka: 3 });
   k.skin(cab, M.paint);
-  k.top(cab, quad([0.13, -0.58], [0.73, -0.7], [0.13, 0.58], [0.73, 0.7]), M.glass);
-  k.side(cab, quad([-0.78, 1.0], [0.68, 0.99], [-0.36, 1.185], [0.11, 1.2]), M.glass);
-  k.side(cab, quad([-1.18, 1.0], [-0.95, 1.0], [-0.95, 1.06], [-0.86, 1.1]), M.trim, { off: 0.005 });
-  k.top(cab, quad([-1.88, -0.5], [-0.88, -0.56], [-1.88, 0.5], [-0.88, 0.56]), M.glass);
-  // bold twin stripes over the whole car
+  k.top(cab, quad([0.16, -0.6], [0.73, -0.71], [0.16, 0.6], [0.73, 0.71]), M.glass);
+  k.side(cab, quad([-0.78, 1.0], [0.68, 0.99], [-0.36, 1.23], [0.14, 1.27]), M.glass);
+  k.side(cab, quad([-1.18, 1.0], [-0.95, 1.0], [-0.95, 1.08], [-0.86, 1.14]), M.trim, { off: 0.005 });
+  k.top(cab, quad([-1.9, -0.5], [-0.85, -0.56], [-1.9, 0.5], [-0.85, 0.56]), M.glass);
+  // Shelby-style twin stripes over the whole car
   sym(s => {
     const [a, b] = s > 0 ? [0.09, 0.3] : [-0.3, -0.09];
-    k.top(body, rect(0.74, 2.37, a, b), M.accent, { off: 0.005, nu: 30, nv: 3 });
-    k.top(body, rect(-2.09, -1.92, a, b), M.accent, { off: 0.005, nu: 4, nv: 3 });
-    k.top(cab, rect(-0.84, 0.14, a, b), M.accent, { off: 0.005, nu: 16, nv: 3 });
-    k.top(cab, rect(-1.95, -1.88, a, b), M.accent, { off: 0.005, nu: 3, nv: 3 });
+    k.top(body, rect(0.74, 2.46, a, b), M.accent, { off: 0.005, nu: 30, nv: 3 });
+    k.top(body, rect(-2.13, -1.92, a, b), M.accent, { off: 0.005, nu: 4, nv: 3 });
+    k.top(cab, rect(-0.82, 0.17, a, b), M.accent, { off: 0.005, nu: 16, nv: 3 });
+    k.top(cab, rect(-2.0, -1.9, a, b), M.accent, { off: 0.005, nu: 3, nv: 3 });
   });
-  k.side(body, rect(-1.85, 2.25, 0.27, 0.34), M.accent, { off: 0.005, nu: 40, nv: 2 });
-  // side scoop, shut lines
-  k.side(body, quad([-0.7, 0.49], [-0.36, 0.49], [-0.7, 0.63], [-0.4, 0.63]), M.grille, { off: 0.002 });
-  shut(k, body, 0.68, 0.26, 0.95); shut(k, body, -0.76, 0.26, 0.97);
-  // front: big recessed grille with chrome surround, round headlights, chrome bumper
-  const FZ = 2.38;
-  k.fascia(roundRect(-0.62, 0.46, 0.62, 0.8, 0.08), FZ, 1, M.chrome, 0.05, [roundRect(-0.59, 0.48, 0.59, 0.78, 0.07)], 0.01);
-  k.fascia(roundRect(-0.59, 0.48, 0.59, 0.78, 0.07), FZ, 1, M.grille, 0.06, [], 0.004);
-  for (let i = 0; i < 6; i++) k.fascia([[-0.58, 0.5 + i * 0.05], [0.58, 0.5 + i * 0.05], [0.58, 0.508 + i * 0.05], [-0.58, 0.508 + i * 0.05]], FZ, 1, M.gunmetal, 0.02, [], 0.008);
+  k.side(body, rect(-1.9, 2.3, 0.27, 0.34), M.accent, { off: 0.005, nu: 40, nv: 2 });
+  // side scoop, shut lines, chrome
+  k.side(body, quad([-0.7, 0.51], [-0.36, 0.51], [-0.7, 0.65], [-0.4, 0.65]), M.grille, { off: 0.002 });
+  shut(k, body, 0.68, 0.28, 0.93); shut(k, body, -0.76, 0.28, 0.95);
+  // front: recessed grille with chrome surround, round headlights, chrome bumper
+  const grille = roundRect(-0.6, 0.48, 0.6, 0.82, 0.08);
+  k.fascia(grille, 2.45, 1, M.chrome, 0.05, [roundRect(-0.57, 0.5, 0.57, 0.8, 0.07)], 0.01);
+  k.fascia(roundRect(-0.57, 0.5, 0.57, 0.8, 0.07), 2.45, 1, M.grille, 0.06, [], 0.004);
+  for (let i = 0; i < 6; i++) k.fascia([[-0.56, 0.52 + i * 0.05], [0.56, 0.52 + i * 0.05], [0.56, 0.528 + i * 0.05], [-0.56, 0.528 + i * 0.05]], 2.45, 1, M.gunmetal, 0.02, [], 0.008);
   sym(s => {
-    k.fascia(ellipsePts(s * 0.68, 0.7, 0.09, 0.09, 20), FZ, 1, M.chrome, 0.03, [ellipsePts(s * 0.68, 0.7, 0.074, 0.074, 20)], 0.012);
-    k.fascia(ellipsePts(s * 0.68, 0.7, 0.076, 0.076, 20), FZ, 1, M.lamp, 0.03, [], 0.004);
-    k.fascia(ellipsePts(s * 0.43, 0.63, 0.045, 0.045, 14), FZ, 1, M.amber, 0.03, [], 0.004);
+    k.fascia(ellipsePts(s * 0.7, 0.72, 0.085, 0.085, 20), 2.45, 1, M.chrome, 0.03, [ellipsePts(s * 0.7, 0.72, 0.07, 0.07, 20)], 0.012);
+    k.fascia(ellipsePts(s * 0.7, 0.72, 0.072, 0.072, 20), 2.45, 1, M.lamp, 0.03, [], 0.004);
+    k.fascia(ellipsePts(s * 0.44, 0.65, 0.045, 0.045, 14), 2.45, 1, M.amber, 0.03, [], 0.004);
   });
-  k.tube([[-0.9, 0.38, 2.22], [-0.84, 0.38, 2.38], [0, 0.38, 2.43], [0.84, 0.38, 2.38], [0.9, 0.38, 2.22]], 0.055, M.chrome, 40, false, 10);
-  // rear: tail panel in a deeper shade of the paint, big triple-bar lamps in chrome bezels with a glow
-  const RZ = -2.12;
-  k.fascia(roundRect(-0.82, 0.54, 0.82, 0.86, 0.06), RZ, -1, M.accent2, 0.03);
+  k.tube([[-0.86, 0.38, 2.3], [-0.8, 0.38, 2.46], [0, 0.38, 2.5], [0.8, 0.38, 2.46], [0.86, 0.38, 2.3]], 0.05, M.chrome, 40, false, 10);
+  // rear: black tail panel, triple lamps, gas cap, bumper, exhausts
+  k.fascia(roundRect(-0.8, 0.56, 0.8, 0.84, 0.05), -2.16, -1, M.accent2, 0.03);   // tail panel in a deeper shade of the paint
+  // big triple-bar lamps in a chrome bezel, with a glow halo
   sym(s => {
-    const x0 = s > 0 ? 0.235 : -0.705, x1 = s > 0 ? 0.705 : -0.235;
-    k.fascia(roundRect(x0, 0.56, x1, 0.845, 0.045), RZ, -1, M.chrome, 0.03, [roundRect(x0 + 0.02, 0.58, x1 - 0.02, 0.825, 0.035)], 0.01);
-    for (let i = 0; i < 3; i++) k.fascia(roundRect(s * (0.32 + i * 0.15) - 0.065, 0.585, s * (0.32 + i * 0.15) + 0.065, 0.82, 0.03), RZ, -1, M.tail, 0.03, [], 0.014);
-    k.glow(s * 0.47, 0.70, RZ, 0.85, 0.6, -1);
+    const x0 = s > 0 ? 0.255 : -0.685, x1 = s > 0 ? 0.685 : -0.255;
+    k.fascia(roundRect(x0, 0.575, x1, 0.835, 0.04), -2.16, -1, M.chrome, 0.03, [roundRect(x0 + 0.02, 0.595, x1 - 0.02, 0.815, 0.03)], 0.01);
+    for (let i = 0; i < 3; i++) k.fascia(roundRect(s * (0.33 + i * 0.14) - 0.06, 0.6, s * (0.33 + i * 0.14) + 0.06, 0.81, 0.025), -2.16, -1, M.tail, 0.03, [], 0.014);
+    k.glow(s * 0.47, 0.705, -2.16, 0.8, 0.55, -1);
   });
-  k.fascia(ellipsePts(0, 0.7, 0.07, 0.07, 18), RZ, -1, M.chrome, 0.03, [], 0.012);
-  k.tube([[-0.92, 0.42, -1.95], [-0.86, 0.42, -2.14], [0, 0.42, -2.19], [0.86, 0.42, -2.14], [0.92, 0.42, -1.95]], 0.05, M.chrome, 40, false, 10);
-  sym(s => k.cyl(0.055, 0.055, 0.22, s * 0.52, 0.3, -2.1, M.chrome, 'z', 14, true));
-  // ducktail spoiler across the deck, C-pillar sails, raised hood scoop
-  k.prof([[-2.115, 0.93], [-1.95, 0.975], [-1.94, 0.995], [-2.13, 1.0]], 1.56, 0, M.paint, 0.015);
+  k.fascia(ellipsePts(0, 0.7, 0.07, 0.07, 18), -2.16, -1, M.chrome, 0.03, [], 0.012);
+  k.tube([[-0.86, 0.42, -2.0], [-0.8, 0.42, -2.18], [0, 0.42, -2.22], [0.8, 0.42, -2.18], [0.86, 0.42, -2.0]], 0.045, M.chrome, 40, false, 10);
+  sym(s => k.cyl(0.045, 0.045, 0.2, s * 0.5, 0.3, -2.16, M.chrome, 'z', 14, true));
   k.prof([[-1.1, 0.9], [-1.3, 0.96], [-1.55, 0.99], [-1.56, 1.0], [-1.1, 0.97]], 0.35, 0, M.paint, 0.01);
-  k.prof([[1.05, 0.92], [1.68, 0.92], [1.7, 1.05], [1.32, 1.035]], 0.46, 0, M.paint, 0.02);
-  k.fascia(roundRect(-0.19, 0.955, 0.19, 1.035, 0.02), 1.7, 1, M.grille, 0.02, [], 0.004);
-  k.mirrorPod(0.9, 1.04, 0.62, 0.13, 0.085, 0.12, M.chrome);
+  k.prof([[1.1, 0.93], [1.65, 0.93], [1.66, 1.0], [1.35, 0.99]], 0.42, 0, M.paint, 0.02); // hood scoop
+  k.fascia(roundRect(-0.17, 0.935, 0.17, 0.985, 0.02), 1.66, 1, M.grille, 0.02, [], 0.004);
+  k.mirrorPod(0.93, 1.04, 0.62, 0.12, 0.08, 0.12, M.chrome);
   wheelSet(k, body, { ...W, rim: 0.7, style: 'five', rimMat: M.brightChrome, caliper: M.caliperRed });
 };
 
