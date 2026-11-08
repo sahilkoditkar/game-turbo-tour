@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildCarMesh } from './carmodels.js';
+import { buildCarMesh, setBrakeLights } from './carmodels.js';
 
 const WHEEL_R = 0.36;
 const WHEELBASE = 2.6;
@@ -302,7 +302,7 @@ export class Car {
     for (const w of this.wheels) w.rotation.x = this.wheelSpin;
     for (const w of this.frontWheels) w.rotation.y = -this.steer * 0.42;
     const braking = this.input.brake > 0 || this.input.handbrake;
-    for (const l of this.brakeLights) l.material.emissiveIntensity = braking ? 3.5 : 0.8;
+    setBrakeLights(this.brakeLights, braking);
   }
 }
 

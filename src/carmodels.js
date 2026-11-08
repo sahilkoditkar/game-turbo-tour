@@ -213,7 +213,8 @@ MODELS.hatch = (k) => {
  * Modelled on the 1967 Ford Mustang fastback (restomod stance): 4.61 m long, 1.79 m wide. */
 MODELS.muscle = (k) => {
   const M = k.M;
-  const W = { fz: 1.47, rz: -1.27, fr: 0.33, rr: 0.335, fx: 0.745, rx: 0.745, fw: 0.245, rw: 0.275 };
+  k.style = 'arcade';
+  const W = { fz: 1.47, rz: -1.27, fr: 0.345, rr: 0.355, fx: 0.745, rx: 0.745, fw: 0.26, rw: 0.3 };
   const body = k.loft([
     [-2.16, 0.80, 0.40, 0.72, 0.93, 6],
     [-2.12, 0.87, 0.34, 0.70, 0.955, 6],
@@ -248,13 +249,13 @@ MODELS.muscle = (k) => {
   k.top(cab, quad([-1.9, -0.5], [-0.85, -0.56], [-1.9, 0.5], [-0.85, 0.56]), M.glass);
   // Shelby-style twin stripes over the whole car
   sym(s => {
-    const [a, b] = s > 0 ? [0.1, 0.27] : [-0.27, -0.1];
+    const [a, b] = s > 0 ? [0.09, 0.3] : [-0.3, -0.09];
     k.top(body, rect(0.74, 2.46, a, b), M.accent, { off: 0.005, nu: 30, nv: 3 });
     k.top(body, rect(-2.13, -1.92, a, b), M.accent, { off: 0.005, nu: 4, nv: 3 });
     k.top(cab, rect(-0.82, 0.17, a, b), M.accent, { off: 0.005, nu: 16, nv: 3 });
     k.top(cab, rect(-2.0, -1.9, a, b), M.accent, { off: 0.005, nu: 3, nv: 3 });
   });
-  k.side(body, rect(-1.9, 2.3, 0.28, 0.32), M.accent, { off: 0.005, nu: 40, nv: 2 });
+  k.side(body, rect(-1.9, 2.3, 0.27, 0.34), M.accent, { off: 0.005, nu: 40, nv: 2 });
   // side scoop, shut lines, chrome
   k.side(body, quad([-0.7, 0.51], [-0.36, 0.51], [-0.7, 0.65], [-0.4, 0.65]), M.grille, { off: 0.002 });
   shut(k, body, 0.68, 0.28, 0.93); shut(k, body, -0.76, 0.28, 0.95);
@@ -270,8 +271,14 @@ MODELS.muscle = (k) => {
   });
   k.tube([[-0.86, 0.38, 2.3], [-0.8, 0.38, 2.46], [0, 0.38, 2.5], [0.8, 0.38, 2.46], [0.86, 0.38, 2.3]], 0.05, M.chrome, 40, false, 10);
   // rear: black tail panel, triple lamps, gas cap, bumper, exhausts
-  k.fascia(roundRect(-0.8, 0.56, 0.8, 0.84, 0.05), -2.16, -1, M.gloss, 0.03);
-  sym(s => { for (let i = 0; i < 3; i++) k.fascia(roundRect(s * (0.36 + i * 0.13) - 0.05, 0.6, s * (0.36 + i * 0.13) + 0.05, 0.8, 0.02), -2.16, -1, M.tail, 0.03, [], 0.014); });
+  k.fascia(roundRect(-0.8, 0.56, 0.8, 0.84, 0.05), -2.16, -1, M.accent2, 0.03);   // tail panel in a deeper shade of the paint
+  // big triple-bar lamps in a chrome bezel, with a glow halo
+  sym(s => {
+    const x0 = s > 0 ? 0.255 : -0.685, x1 = s > 0 ? 0.685 : -0.255;
+    k.fascia(roundRect(x0, 0.575, x1, 0.835, 0.04), -2.16, -1, M.chrome, 0.03, [roundRect(x0 + 0.02, 0.595, x1 - 0.02, 0.815, 0.03)], 0.01);
+    for (let i = 0; i < 3; i++) k.fascia(roundRect(s * (0.33 + i * 0.14) - 0.06, 0.6, s * (0.33 + i * 0.14) + 0.06, 0.81, 0.025), -2.16, -1, M.tail, 0.03, [], 0.014);
+    k.glow(s * 0.47, 0.705, -2.16, 0.8, 0.55, -1);
+  });
   k.fascia(ellipsePts(0, 0.7, 0.07, 0.07, 18), -2.16, -1, M.chrome, 0.03, [], 0.012);
   k.tube([[-0.86, 0.42, -2.0], [-0.8, 0.42, -2.18], [0, 0.42, -2.22], [0.8, 0.42, -2.18], [0.86, 0.42, -2.0]], 0.045, M.chrome, 40, false, 10);
   sym(s => k.cyl(0.045, 0.045, 0.2, s * 0.5, 0.3, -2.16, M.chrome, 'z', 14, true));
@@ -279,7 +286,7 @@ MODELS.muscle = (k) => {
   k.prof([[1.1, 0.93], [1.65, 0.93], [1.66, 1.0], [1.35, 0.99]], 0.42, 0, M.paint, 0.02); // hood scoop
   k.fascia(roundRect(-0.17, 0.935, 0.17, 0.985, 0.02), 1.66, 1, M.grille, 0.02, [], 0.004);
   k.mirrorPod(0.93, 1.04, 0.62, 0.12, 0.08, 0.12, M.chrome);
-  wheelSet(k, body, { ...W, rim: 0.66, style: 'five', rimMat: M.alu, caliper: M.caliperRed });
+  wheelSet(k, body, { ...W, rim: 0.7, style: 'five', rimMat: M.brightChrome, caliper: M.caliperRed });
 };
 
 /* ================================================================ Classic roadster
@@ -799,25 +806,42 @@ function numberTexture(n, plate) {
   return t;
 }
 
-function instanceMaterials(color) {
+function instanceMaterials(color, style) {
   const S = sharedMaterials();
   const c = new THREE.Color(color);
   const hsl = {}; c.getHSL(hsl);
   const light = hsl.l > 0.62 || (hsl.h > 0.1 && hsl.h < 0.2 && hsl.l > 0.45);
-  const paint = S.paint.clone(); paint.color.copy(c); paint.metalness = 0.45; paint.roughness = 0.3; paint.clearcoatRoughness = 0.06;
-  const accent = S.accent.clone(); accent.color.set(light ? 0x15171c : 0xf3f3f1); accent.metalness = 0.2;
-  const accent2 = S.accent2.clone(); accent2.color.copy(c).offsetHSL(0, 0, light ? -0.3 : -0.18); accent2.metalness = 0.4;
+  const arcade = style === 'arcade';
+  const paint = S.paint.clone(); paint.color.copy(c);
+  // arcade: candy-gloss paint that keeps its colour (low metalness), lamps that glow
+  if (arcade) { paint.metalness = 0.1; paint.roughness = 0.42; paint.clearcoat = 0.6; paint.clearcoatRoughness = 0.12; paint.envMapIntensity = 0.55; }
+  else { paint.metalness = 0.45; paint.roughness = 0.3; paint.clearcoatRoughness = 0.06; }
+  const accent = S.accent.clone(); accent.color.set(light ? 0x15171c : 0xf3f3f1); accent.metalness = arcade ? 0.05 : 0.2;
+  const accent2 = S.accent2.clone(); accent2.color.copy(c).offsetHSL(0, 0, light ? -0.3 : -0.18); accent2.metalness = arcade ? 0.1 : 0.4;
   const tail = S.tail.clone();
+  tail.userData.idle = 0.8; tail.userData.brake = 3.5;
+  // arcade lamps skip tone mapping so they stay a deep, saturated red instead of washing out to orange
+  if (arcade) { tail.color.set(0x5a0000); tail.emissive.set(0xff1808); tail.toneMapped = false; tail.userData.idle = 0.85; tail.userData.brake = 1.6; tail.emissiveIntensity = 0.85; }
+  const glow = S.glow.clone();
+  glow.userData.idle = 0.55; glow.userData.brake = 1.0; glow.opacity = 0.55;
   const n = (Math.imul(color >>> 0, 2654435761) >>> 0) % 98 + 2;
   const plate = S.plate.clone(); plate.map = numberTexture(n, true);
   const num = S.num.clone(); num.map = numberTexture(n, false);
-  return { paint, accent, accent2, tail, plate, num };
+  return { paint, accent, accent2, tail, glow, plate, num };
+}
+
+/** Switch a car's brake lights (lamps and their glow halos) on or off. */
+export function setBrakeLights(list, on) {
+  for (const l of list) {
+    const m = l.material, v = on ? m.userData.brake : m.userData.idle;
+    if (m.isMeshBasicMaterial) m.opacity = v; else m.emissiveIntensity = v;
+  }
 }
 
 /** Build a car mesh. quality: 'high' | 'low'. userData: { wheels, frontWheels, body, brakeLights }. */
 export function buildCarMesh(shape, color, quality = 'high') {
   const g = template(shape, quality).clone(true);
-  const mats = instanceMaterials(color);
+  const mats = instanceMaterials(color, g.userData.style);
   const wheels = [], frontWheels = [], brakeLights = [];
   let body = null;
   g.traverse((o) => {
@@ -828,7 +852,7 @@ export function buildCarMesh(shape, color, quality = 'high') {
     if (o.isMesh) {
       const r = o.material.userData.role;
       if (r && mats[r]) o.material = mats[r];
-      if (r === 'tail') brakeLights.push(o);
+      if (r === 'tail' || r === 'glow') brakeLights.push(o);
     }
   });
   g.userData = { wheels, frontWheels, body, brakeLights };

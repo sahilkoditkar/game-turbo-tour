@@ -2,7 +2,7 @@
 // their lane, slow for corners, queue behind each other and the player, pick a
 // turn at junctions, and are recycled as the player moves on.
 import * as THREE from 'three';
-import { buildCarMesh } from './carmodels.js';
+import { buildCarMesh, setBrakeLights } from './carmodels.js';
 import { mulberry32 } from './world.js';
 import { specOf, contact, resolve, applyToCar, carBody } from './crash.js';
 
@@ -179,7 +179,7 @@ export class Traffic {
       // wheels & lights
       car.spin += (car.speed / 0.36) * dt;
       for (const w of car.wheels) w.rotation.x = car.spin;
-      for (const l of car.brakeLights) l.material.emissiveIntensity = car.brake ? 3.5 : 0.8;
+      setBrakeLights(car.brakeLights, car.brake);
     }
     this._collidePlayer(dt);
     this._collideKnocked();
@@ -244,7 +244,7 @@ export class Traffic {
     c.knock = { vx: T.vx, vz: T.vz, w: T.w, rest: 0, idx: this.W.roadWrap(c.road, c.road.i0 + Math.round(c.s), true) };
     c.knockId = ++this.knocks;
     c.speed = 0; c.brake = true;
-    for (const l of c.brakeLights) l.material.emissiveIntensity = 3.5;
+    setBrakeLights(c.brakeLights, true);
   }
 
   /**
