@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { THEMES } from './tracks.js';
 
 const SPACING = 2; // metres between samples along the centreline
+const ROAD_SCALE = 1.4; // track widths in tracks.js are scaled by this: wide arcade roads
 
 function catmullRom(p0, p1, p2, p3, t) {
   const t2 = t * t, t3 = t2 * t;
@@ -68,7 +69,7 @@ export class Track {
   constructor(def, quality = 'high') {
     this.def = def;
     this.theme = THEMES[def.theme];
-    this.halfWidth = def.width / 2;   // nominal; per-sample values live in samples[i].hw / .wall
+    this.halfWidth = (def.width * ROAD_SCALE) / 2;   // nominal; per-sample values live in samples[i].hw / .wall
     this.wallOffset = this.halfWidth + 3.2; // replaced by the maximum once samples are built
     this.spacing = SPACING;
     this.group = new THREE.Group();
@@ -107,8 +108,8 @@ export class Track {
         curv: 0,
         slope: (heights[W(i + 1)] - heights[W(i - 1)]) / ((W(i + 1) - W(i - 1)) * SPACING || SPACING),
         heading: Math.atan2(tx, tz),
-        hw: (this.def.width / 2) * widths[i],
-        wall: (this.def.width / 2) * widths[i] + 3.2,
+        hw: this.halfWidth * widths[i],
+        wall: this.halfWidth * widths[i] + 3.2,
       });
     }
     this.maxHalfWidth = Math.max(...this.samples.map(q => q.hw));
@@ -375,7 +376,9 @@ export class Track {
     const HW = (q) => q.hw, NHW = (q) => -q.hw, WALL = (q) => q.wall, NWALL = (q) => -q.wall;
 
     // Road surface
-    const roadTex = makeRoadTexture(th);
+    // about one lane per 6 m of road: 3 lanes on most tracks, 4 on the widest
+    const lanes = Math.max(2, Math.min(4, Math.round((this.halfWidth * 2) / 6)));
+    const roadTex = makeRoadTexture(th, lanes);
     roadTex.wrapT = THREE.RepeatWrapping;
     roadTex.wrapS = THREE.ClampToEdgeWrapping;
     const road = this._strip(N, HW, NHW, 0.12, (i, side) => [side === 0 ? 0 : 1, (i * SPACING) / 12]);
@@ -555,27 +558,39 @@ function lerpColor(a, b, t) {
   return ca.lerp(cb, t).getHex();
 }
 
-function makeRoadTexture(theme) {
+/**
+ * Asphalt with bold markings: solid white edge lines and dashed white lane dividers
+ * (4.5 m dash, 7.5 m gap over the 12 m repeat). With an even number of lanes the
+ * centre divider is a solid yellow line instead.
+ */
+function makeRoadTexture(theme, lanes = 3) {
+  const W = 512, H = 256;
   const c = document.createElement('canvas');
-  c.width = 256; c.height = 256;
+  c.width = W; c.height = H;
   const ctx = c.getContext('2d');
   const base = new THREE.Color(theme.road);
   ctx.fillStyle = `rgb(${base.r * 255 | 0},${base.g * 255 | 0},${base.b * 255 | 0})`;
-  ctx.fillRect(0, 0, 256, 256);
+  ctx.fillRect(0, 0, W, H);
   // asphalt noise
-  const img = ctx.getImageData(0, 0, 256, 256);
+  const img = ctx.getImageData(0, 0, W, H);
   for (let i = 0; i < img.data.length; i += 4) {
-    const n = (Math.random() - 0.5) * 26;
+    const n = (Math.random() - 0.5) * 22;
     img.data[i] += n; img.data[i + 1] += n; img.data[i + 2] += n;
   }
   ctx.putImageData(img, 0, 0);
   // edge lines
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.fillRect(6, 0, 5, 256);
-  ctx.fillRect(245, 0, 5, 256);
-  // dashed centre line
-  ctx.fillStyle = 'rgba(255,255,255,0.7)';
-  ctx.fillRect(126, 0, 4, 100);
+  const line = 9;
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.fillRect(10, 0, line, H);
+  ctx.fillRect(W - 10 - line, 0, line, H);
+  // lane dividers
+  const dash = Math.round(H * 4.5 / 12);
+  for (let k = 1; k < lanes; k++) {
+    const x = Math.round(10 + line + (W - 2 * (10 + line)) * (k / lanes)) - line / 2;
+    if (lanes % 2 === 0 && k === lanes / 2) { ctx.fillStyle = 'rgba(255,205,40,0.95)'; ctx.fillRect(x, 0, line, H); continue; }
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillRect(x, 0, line, dash);
+  }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 8;
