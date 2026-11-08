@@ -157,7 +157,7 @@ export function buildSky(scene, th, seed = 99) {
       uGlowAmt: { value: th.skyGlowAmt ?? 0 },
       uSunColor: { value: new THREE.Color(th.sunColor ?? 0xfff3c4) },
       uSunDir: { value: sunDir },
-      uSunSize: { value: th.night ? 0 : Math.cos(THREE.MathUtils.degToRad(th.sunSize ?? 2.4)) },
+      uSunSize: { value: th.night && !th.moon ? 0 : Math.cos(THREE.MathUtils.degToRad(th.sunSize ?? 2.4)) },   // at night, a moon
       uCloudN: { value: clouds.n }, uCloudC: { value: clouds.c }, uPuff: { value: clouds.p },
       uCloud: { value: new THREE.Color(th.cloudColor ?? 0xffffff) },
       uCloudShade: { value: new THREE.Color(th.cloudShade ?? 0x98b4de) },

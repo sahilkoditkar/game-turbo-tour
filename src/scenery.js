@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { addVegetation } from './nature.js';
+import { mergeByMaterial } from './carkit.js';
 
 // Deterministic pseudo-random so the scenery is the same every time.
 function mulberry32(a) {
@@ -137,45 +138,117 @@ export function buildScenery(track, quality = 'high') {
   return g;
 }
 
+const NEON = [0xff2d95, 0x00e5ff, 0xb46bff, 0xff8a00, 0x39ff88];
+
+/**
+ * Night towers: dark blue-violet blocks with bright windows in three palettes, neon strips
+ * round the roof line and up a corner, and neon signs. The strips and signs skip tone
+ * mapping so they stay vivid, and are merged into one mesh per colour.
+ */
 function addBuildings(g, boxes, rand) {
-  const winTex = makeWindowTexture();
-  winTex.wrapS = winTex.wrapT = THREE.RepeatWrapping;
+  const winTex = [makeWindowTexture('warm'), makeWindowTexture('cool'), makeWindowTexture('mixed')];
+  for (const t of winTex) t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  const neonMats = NEON.map(c => new THREE.MeshBasicMaterial({ color: c, toneMapped: false }));
+  const glowHolder = new THREE.Group();
+  const strip = (w, h, d, x, y, z, ci) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), neonMats[ci]); m.position.set(x, y, z); glowHolder.add(m); };
   for (const bx of boxes) {
-    const tex = winTex.clone();
+    const tex = winTex[Math.floor(rand() * winTex.length)].clone();
     tex.needsUpdate = true;
-    tex.repeat.set(Math.round(bx.w / 4), Math.round(bx.h / 4));
-    const c = new THREE.Color().setHSL(0.55 + bx.hue * 0.2, 0.25, 0.22);
-    const mat = new THREE.MeshStandardMaterial({ color: c, map: tex, emissive: 0xffe8b0, emissiveMap: tex, emissiveIntensity: 0.9, roughness: 0.5 });
+    tex.repeat.set(Math.max(1, Math.round(bx.w / 4)), Math.max(1, Math.round(bx.h / 4)));
+    const c = new THREE.Color().setHSL(0.64 + bx.hue * 0.1, 0.45, 0.07 + rand() * 0.05);
+    const mat = new THREE.MeshStandardMaterial({ color: c, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 1.1, roughness: 0.45, metalness: 0.25 });
+    const y0 = bx.y || 0;
     const m = new THREE.Mesh(new THREE.BoxGeometry(bx.w, bx.h + 4, bx.d), mat);
-    m.position.set(bx.x, (bx.y || 0) + bx.h / 2 - 2, bx.z);
+    m.position.set(bx.x, y0 + bx.h / 2 - 2, bx.z);
     g.add(m);
-    if (rand() > 0.6) {
-      const neon = new THREE.Mesh(new THREE.BoxGeometry(bx.w * 0.6, 1.2, 0.4), new THREE.MeshStandardMaterial({ color: 0x000000, emissive: [0xff2d95, 0x00e5ff, 0xb7ff00, 0xff8a00][Math.floor(rand() * 4)], emissiveIntensity: 2 }));
-      neon.position.set(bx.x, (bx.y || 0) + bx.h * (0.5 + rand() * 0.4), bx.z + bx.d / 2 + 0.3);
-      g.add(neon);
+    const ci = Math.floor(rand() * NEON.length), top = y0 + bx.h + 2;
+    if (rand() < 0.6) {   // neon outline round the roof
+      const t = 0.35;
+      strip(bx.w + t, t, t, bx.x, top, bx.z + bx.d / 2, ci);
+      strip(bx.w + t, t, t, bx.x, top, bx.z - bx.d / 2, ci);
+      strip(t, t, bx.d + t, bx.x + bx.w / 2, top, bx.z, ci);
+      strip(t, t, bx.d + t, bx.x - bx.w / 2, top, bx.z, ci);
+    }
+    if (rand() < 0.3) {   // a strip up one corner
+      const sx = rand() < 0.5 ? 1 : -1, sz = rand() < 0.5 ? 1 : -1;
+      strip(0.3, bx.h + 2, 0.3, bx.x + sx * bx.w / 2, y0 + bx.h / 2, bx.z + sz * bx.d / 2, ci);
+    }
+    if (rand() < 0.55) {  // a sign on a face
+      const face = Math.floor(rand() * 4), along = face < 2 ? bx.w : bx.d;
+      const sw = along * (0.35 + rand() * 0.3), sh = 1.4 + rand() * 1.6, sy = y0 + bx.h * (0.35 + rand() * 0.5);
+      const off = (face < 2 ? bx.d : bx.w) / 2 + 0.3, sgn = face % 2 ? -1 : 1;
+      if (face < 2) strip(sw, sh, 0.3, bx.x, sy, bx.z + sgn * off, (ci + 1) % NEON.length);
+      else strip(0.3, sh, sw, bx.x + sgn * off, sy, bx.z, (ci + 1) % NEON.length);
     }
   }
+  mergeByMaterial(glowHolder);
+  glowHolder.traverse(o => { if (o.isMesh) o.castShadow = false; });
+  g.add(glowHolder);
 }
 
+/** Soft round glow sprite (white core fading out) for lamp halos and light pools. */
+function glowTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const x = c.getContext('2d');
+  const gr = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gr.addColorStop(0, 'rgba(255,255,255,1)');
+  gr.addColorStop(0.3, 'rgba(255,255,255,0.55)');
+  gr.addColorStop(0.7, 'rgba(255,255,255,0.12)');
+  gr.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = gr; x.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/**
+ * Street lamps on arms over the road, each with a glowing head, a soft halo and a pool of
+ * light on the tarmac (additive decals, so the road reads without dozens of real lights).
+ */
 function addStreetLights(g, track, highQ) {
-  const poleGeo = new THREE.CylinderGeometry(0.12, 0.16, 7, 6);
-  const poleMat = new THREE.MeshStandardMaterial({ color: 0x555a66 });
-  const lampGeo = new THREE.SphereGeometry(0.4, 8, 8);
-  const lampMat = new THREE.MeshStandardMaterial({ color: 0xfff1c0, emissive: 0xffd27a, emissiveIntensity: 3 });
-  const step = 22;
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0x3a3f52, roughness: 0.5, metalness: 0.4 });
+  const headMat = new THREE.MeshBasicMaterial({ color: 0xfff1d0, toneMapped: false });
+  const glowTex = glowTexture();
+  const haloMat = new THREE.SpriteMaterial({ map: glowTex, color: 0xffc46b, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+  const holder = new THREE.Group();
+  const pools = [];
+  const step = 16;
   for (let i = 0; i < track.count; i += step) {
     const s = track.samples[i];
     const sd = (Math.floor(i / step) % 2) ? 1 : -1;
-    const x = s.p.x + s.n.x * sd * (s.wall + 1.5), z = s.p.z + s.n.z * sd * (s.wall + 1.5);
-    const y = s.p.y;
-    const pole = new THREE.Mesh(poleGeo, poleMat); pole.position.set(x, y + 3.5, z); g.add(pole);
-    const lamp = new THREE.Mesh(lampGeo, lampMat); lamp.position.set(x, y + 7.1, z); g.add(lamp);
-    if (highQ && (Math.floor(i / step) % 3 === 0)) {
-      const pl = new THREE.PointLight(0xffd27a, 40, 45, 2);
-      pl.position.set(x, y + 6.5, z);
+    const bx = s.p.x + s.n.x * sd * (s.wall + 1.2), bz = s.p.z + s.n.z * sd * (s.wall + 1.2), y = s.p.y;
+    const reach = Math.min(5, s.wall * 0.4);   // arm reaches out over the road
+    const hx = bx - s.n.x * sd * reach, hz = bz - s.n.z * sd * reach;
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.18, 8, 6), poleMat); pole.position.set(bx, y + 4, bz); holder.add(pole);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, reach), poleMat);
+    arm.position.set((bx + hx) / 2, y + 7.9, (bz + hz) / 2); arm.lookAt(hx, y + 7.9, hz); holder.add(arm);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.18, 0.45), headMat);
+    head.position.set(hx, y + 7.75, hz); head.rotation.y = s.heading + Math.PI / 2; holder.add(head);
+    const halo = new THREE.Sprite(haloMat); halo.position.set(hx, y + 7.6, hz); halo.scale.set(5, 5, 1); g.add(halo);
+    pools.push([hx, y + 0.17, hz]);
+    if (highQ && (Math.floor(i / step) % 4 === 0)) {
+      const pl = new THREE.PointLight(0xffc46b, 70, 40, 2);
+      pl.position.set(hx, y + 7, hz);
       g.add(pl);
     }
   }
+  mergeByMaterial(holder);
+  g.add(holder);
+  // light pools: one mesh of flat quads
+  const R = 11, pos = [], uv = [], idx = [];
+  pools.forEach(([x, y, z], k) => {
+    pos.push(x - R, y, z - R, x + R, y, z - R, x + R, y, z + R, x - R, y, z + R);
+    uv.push(0, 0, 1, 0, 1, 1, 0, 1);
+    const o = k * 4; idx.push(o, o + 2, o + 1, o, o + 3, o + 2);
+  });
+  const pg = new THREE.BufferGeometry();
+  pg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  pg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  pg.setIndex(idx);
+  const pool = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ map: glowTex, color: 0xc08a48, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }));
+  pool.renderOrder = 1;
+  g.add(pool);
 }
 
 function buildGrandstand(th, rand) {
@@ -223,13 +296,20 @@ function makeGroundTexture(th) {
   return tex;
 }
 
-function makeWindowTexture() {
+/** Lit windows on a dark facade; palette 'warm', 'cool' or 'mixed'. */
+function makeWindowTexture(palette = 'warm') {
   const c = document.createElement('canvas');
   c.width = 32; c.height = 32;
   const ctx = c.getContext('2d');
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 32, 32);
+  const pick = () => {
+    const r = Math.random();
+    if (palette === 'warm') return `rgb(255,${190 + Math.random() * 60 | 0},${110 + Math.random() * 80 | 0})`;
+    if (palette === 'cool') return r < 0.8 ? `rgb(${170 + Math.random() * 60 | 0},${225 + Math.random() * 30 | 0},255)` : 'rgb(255,240,210)';
+    return r < 0.5 ? 'rgb(255,214,150)' : r < 0.75 ? 'rgb(140,230,255)' : r < 0.9 ? 'rgb(255,120,200)' : 'rgb(200,160,255)';
+  };
   for (let y = 0; y < 32; y += 8) for (let x = 0; x < 32; x += 8) {
-    if (Math.random() < 0.55) { ctx.fillStyle = `rgba(255,${200 + Math.random() * 55 | 0},${120 + Math.random() * 100 | 0},1)`; ctx.fillRect(x + 2, y + 2, 4, 4); }
+    if (Math.random() < 0.5) { ctx.fillStyle = pick(); ctx.fillRect(x + 2, y + 2, 4, 4); }
   }
   const tex = new THREE.CanvasTexture(c);
   tex.magFilter = THREE.NearestFilter;

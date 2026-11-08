@@ -31,7 +31,7 @@ export class Race {
     this.scene = new THREE.Scene();
     this.track = new Track(o.config.track, this.quality);
     this.theme = this.track.theme;
-    this.scene.fog = new THREE.Fog(this.theme.fog, this.theme.night ? 60 : 180, this.theme.night ? 520 : 1400);
+    this.scene.fog = new THREE.Fog(this.theme.fog, this.theme.night ? 140 : 180, this.theme.night ? 950 : 1400);
     buildSky(this.scene, this.theme);
     // the coastal sea lies off the +z side of the track: keep the backdrop low there
     buildBackdrop(this.scene, this.theme, { seed: this.track.def.id.length * 131 + 7, seaDir: this.theme.water !== null ? Math.PI / 2 : null });
