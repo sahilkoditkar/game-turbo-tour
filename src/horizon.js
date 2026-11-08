@@ -1032,15 +1032,15 @@ function makeWorldRoadTexture(kind, width) {
   for (let i = 0; i < img.data.length; i += 4) { const n = (Math.random() - 0.5) * (kind === 'dirt' ? 40 : 26); img.data[i] += n; img.data[i + 1] += n; img.data[i + 2] += n; }
   ctx.putImageData(img, 0, 0);
   if (kind !== 'dirt' && kind !== 'pad') {
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.fillRect(5, 0, 4, 256); ctx.fillRect(247, 0, 4, 256);
-    if (kind === 'highway') {
-      ctx.fillStyle = 'rgba(255,210,60,0.9)'; ctx.fillRect(126, 0, 4, 256);
-      ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(62, 0, 3, 110); ctx.fillRect(190, 0, 3, 110);
-    } else if (kind === 'street') {
-      ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(126, 0, 4, 90);
-    } else if (kind === 'road') {
-      ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(126, 0, 4, 110);
+    // bold markings: solid edge lines; highways and main roads have four lanes (solid yellow
+    // centre, dashed white dividers), streets and lanes two (dashed white centre)
+    ctx.fillStyle = 'rgba(255,255,255,0.88)';
+    ctx.fillRect(5, 0, 6, 256); ctx.fillRect(245, 0, 6, 256);
+    if (kind === 'highway' || kind === 'road') {
+      ctx.fillStyle = 'rgba(255,205,40,0.95)'; ctx.fillRect(125, 0, 6, 256);
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(65, 0, 5, 96); ctx.fillRect(186, 0, 5, 96);
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(125, 0, 6, 96);
     }
   }
   const tex = new THREE.CanvasTexture(c);

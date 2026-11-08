@@ -6,6 +6,9 @@ import { buildCarMesh, setBrakeLights } from './carmodels.js';
 import { mulberry32 } from './world.js';
 import { specOf, contact, resolve, applyToCar, carBody } from './crash.js';
 
+/** Highways and main roads have two lanes each way. */
+const multiLane = (road) => road.kind === 'highway' || road.kind === 'road';
+
 const SHAPES = ['pony', 'raiden', 'kaze', 'classic', 'muscle', 'raiden', 'pony', 'kaze', 'mamba', 'super'];
 const COLORS = [0xd9d9df, 0x2b2e36, 0x8c939e, 0xb52a2a, 0x1f4e9c, 0xe6e6e6, 0x3f3f46, 0x6c8f3a, 0xc27a1a, 0x7a2d6d];
 const KIND_SPEED = { highway: 29, road: 22, lane: 17, dirt: 12, street: 13 };
@@ -29,7 +32,7 @@ export class Traffic {
   /** Right-hand lane offset (metres along the left normal) for a road and travel direction. */
   laneFor(road, dir, slot = 0) {
     const hw = road.width / 2;
-    const k = road.kind === 'highway' ? (slot ? 0.74 : 0.28) : 0.5;
+    const k = multiLane(road) ? (slot ? 0.74 : 0.28) : 0.5;
     return -dir * hw * k;
   }
 
@@ -47,7 +50,7 @@ export class Traffic {
       if (this.cars.some(c => Math.hypot(c.pos.x - s.p.x, c.pos.z - s.p.z) < 25)) continue;
       const dir = this.rand() < 0.5 ? 1 : -1;
       const car = this.pool.pop() || this._makeCar();
-      car.road = road; car.dir = dir; car.s = s.li; car.slot = road.kind === 'highway' && this.rand() < 0.4 ? 1 : 0;
+      car.road = road; car.dir = dir; car.s = s.li; car.slot = multiLane(road) && this.rand() < 0.4 ? 1 : 0;
       car.lane = this.laneFor(road, dir, car.slot); car.lat = car.lane;
       car.speed = KIND_SPEED[road.kind] * (0.8 + this.rand() * 0.2); car.cruise = KIND_SPEED[road.kind] * (0.85 + this.rand() * 0.25);
       car.brake = false; car.heading = s.heading + (dir < 0 ? Math.PI : 0); car.lastJunction = -1; car.knock = null;
@@ -164,7 +167,7 @@ export class Traffic {
           const other = W.samples[j.other], oroad = W.roadOf(j.other);
           if (oroad.closed || (other.li > 25 && other.li < oroad.n - 25)) {
             car.road = oroad; car.s = other.li; car.dir = this.rand() < 0.5 ? 1 : -1;
-            car.slot = oroad.kind === 'highway' && this.rand() < 0.4 ? 1 : 0;
+            car.slot = multiLane(oroad) && this.rand() < 0.4 ? 1 : 0;
             car.lane = this.laneFor(oroad, car.dir, car.slot); car.lat = car.lat * 0.5 + car.lane * 0.5;
             car.cruise = KIND_SPEED[oroad.kind] * (0.85 + this.rand() * 0.25);
             car.speed = Math.min(car.speed, 9);
