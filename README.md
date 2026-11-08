@@ -13,7 +13,7 @@ website, so it is hosted directly on GitHub Pages (or any static host).
 
 - Open-world free roam: a 6 km island with a city, villages, highways and gravel trails
 - 16 circuits (including Silverstone-, Monza- and Spa-inspired layouts) and 4 point-to-point stages
-- 10 cars, from a hot hatch to a hypercar and an F1 car, with upgrades and paint
+- 11 cars, from a hot hatch to a V12 supercar, a hypercar and an F1 car, with upgrades and paint
 - Split-screen 2-player racing on one keyboard or two gamepads
 - Drifting, crash physics, dynamic AI, championships and a time trial ghost car
 - Plays in the browser on PC and mobile; progress saves locally

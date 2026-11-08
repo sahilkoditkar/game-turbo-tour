@@ -144,6 +144,90 @@ MODELS.super = (k) => {
   wheelSet(k, body, { ...W, rim: 0.7, style: 'y', rimMat: M.gunmetal, caliper: M.caliperYellow });
 };
 
+/* ================================================================ V12 targa supercar
+ * Modelled on the Ferrari F50: 4.48 m long, 1.99 m wide, 1.12 m tall, 2.58 m wheelbase,
+ * 18-inch wheels. Covered headlamps on the front wings, twin bonnet vents, narrow canopy
+ * with a black hardtop, twin humps over a slatted engine cover, deep side intakes, a
+ * full-width wing growing out of the rear wings and four round lamps in a black mesh tail. */
+MODELS.v12 = (k) => {
+  const M = k.M;
+  k.style = 'arcade';
+  const W = { fz: 1.25, rz: -1.33, fr: 0.315, rr: 0.335, fx: 0.81, rx: 0.8, fw: 0.245, rw: 0.335 };
+  const body = k.loft([
+    [-2.24, 0.86, 0.32, 0.70, 0.86, 6],
+    [-2.20, 0.95, 0.26, 0.70, 0.90, 6],
+    [-2.00, 0.985, 0.20, 0.68, 0.935, 6, 0.05],
+    [-1.33, 0.993, 0.15, 0.63, 0.95, 6, 0.11],
+    [-0.70, 0.97, 0.14, 0.58, 0.90, 6, 0.10],
+    [0.00, 0.95, 0.14, 0.54, 0.78, 6, 0.06],
+    [0.70, 0.955, 0.14, 0.52, 0.72, 6, 0.07],
+    [1.25, 0.975, 0.14, 0.52, 0.70, 6, 0.13],
+    [1.80, 0.94, 0.13, 0.45, 0.58, 6, 0.09],
+    [2.10, 0.84, 0.12, 0.38, 0.47, 5, 0.05],
+    [2.24, 0.62, 0.14, 0.32, 0.38, 4],
+  ], {
+    arches: [k.arch(W.fz, W.fr, W.fx, W.fw), k.arch(W.rz, W.rr, W.rx, W.rw)],
+    dents: [{ z0: -1.02, z1: -0.5, y0: 0.3, y1: (z) => 0.62 - (z + 1.02) * 0.2, depth: 0.1, s: 0.025 }],
+  });
+  k.skin(body, M.paint);
+  archLips(k, body, M.paint, 0.012);
+  const cab = k.loft([
+    [-0.95, 0.56, 0.78, 0.86, 0.93, 3],
+    [-0.55, 0.60, 0.76, 0.87, 1.06, 3],
+    [-0.20, 0.62, 0.74, 0.86, 1.115, 3.2],
+    [0.15, 0.64, 0.72, 0.85, 1.12, 3.2],
+    [0.50, 0.68, 0.70, 0.83, 1.03, 3],
+    [0.95, 0.73, 0.68, 0.78, 0.80, 3],
+    [1.02, 0.70, 0.68, 0.77, 0.77, 3],
+  ], { n: 32, kb: 22, ka: 3 });
+  k.skin(cab, M.paint);
+  // glass and the black hardtop
+  k.top(cab, quad([0.16, -0.54], [0.98, -0.7], [0.16, 0.54], [0.98, 0.7]), M.glass);
+  k.side(cab, quad([-0.5, 0.95], [0.9, 0.82], [-0.42, 1.05], [0.16, 1.09]), M.glass);
+  k.top(cab, rect(-0.62, 0.17, -0.5, 0.5), M.gloss, { off: 0.003 });
+  // twin humps behind the seats flowing back over the engine cover
+  sym(s => k.prof([[-0.52, 0.92], [-0.64, 1.01], [-0.9, 1.005], [-1.45, 0.965], [-1.96, 0.93], [-1.96, 0.84], [-0.52, 0.84]], 0.27, s * 0.27, M.paint, 0.1));
+  // slatted engine cover between the humps
+  k.top(body, rect(-1.95, -0.98, -0.12, 0.12), M.grille, { off: 0.004 });
+  for (let i = 0; i < 7; i++) k.top(body, rect(-1.92 + i * 0.135, -1.87 + i * 0.135, -0.12, 0.12), M.gloss, { off: 0.012, nu: 1 });
+  // doors, sills, deep side intakes, small intake on the rear wing
+  shut(k, body, 0.86, 0.22, 0.7, -0.06); shut(k, body, -0.45, 0.22, 0.86, 0.03);
+  k.side(body, rect(-0.95, 0.95, 0.13, 0.21), M.carbon, { off: 0.006 });
+  k.side(body, quad([-1.02, 0.31], [-0.5, 0.31], [-1.02, 0.62], [-0.72, 0.58]), M.grille, { off: 0.002 });
+  sym(s => k.top(body, quad([-1.15, s * 0.74], [-0.8, s * 0.72], [-1.15, s * 0.9], [-0.8, s * 0.86]), M.grille, { off: 0.003 }));
+  // front: lamps under clear covers on the wings, twin bonnet vents, oval mouth, splitter
+  sym(s => {
+    k.top(body, ellipse(1.98, s * 0.64, 0.2, 0.13, s * -0.2), M.lens, { off: 0.006, nu: 8, nv: 24 });
+    k.top(body, ellipse(2.05, s * 0.6, 0.065, 0.06), M.lamp, { off: 0.011, nu: 4, nv: 16 });
+    k.top(body, ellipse(1.92, s * 0.69, 0.065, 0.06), M.lamp, { off: 0.011, nu: 4, nv: 16 });
+    k.top(body, ellipse(1.52, s * 0.27, 0.3, 0.085, s * 0.12), M.grille, { off: 0.006, nu: 8, nv: 24 });
+    for (const t of [-0.12, 0, 0.12]) k.top(body, ellipse(1.52 + t, s * (0.27 + t * 0.12), 0.012, 0.075, s * 0.12), M.paint, { off: 0.01, nu: 2, nv: 12 });
+    k.top(body, ellipse(2.12, s * 0.48, 0.05, 0.03), M.amber, { off: 0.008, nu: 3, nv: 12 });
+  });
+  k.fascia(ellipsePts(0, 0.25, 0.44, 0.085, 28), 2.24, 1, M.grille, 0.05, [], 0.004);
+  sym(s => k.fascia(ellipsePts(s * 0.62, 0.23, 0.12, 0.06, 18), 2.1, 1, M.grille, 0.05, [], 0.03));
+  k.plate([[-0.88, 1.9], [0.88, 1.9], [0.82, 2.15], [0.5, 2.27], [-0.5, 2.27], [-0.82, 2.15]], 0.085, 0.02, M.trim);
+  // rear: black mesh panel, four round lamps, plate, twin centre exhausts, diffuser
+  const RZ = -2.24;
+  k.fascia(roundRect(-0.86, 0.36, 0.86, 0.80, 0.09), RZ, -1, M.grille, 0.04);
+  sym(s => {
+    for (const x of [0.43, 0.67]) {
+      k.fascia(ellipsePts(s * x, 0.645, 0.098, 0.098, 24), RZ, -1, M.trim, 0.03, [], 0.012);
+      k.fascia(ellipsePts(s * x, 0.645, 0.082, 0.082, 24), RZ, -1, M.tail, 0.03, [], 0.02);
+    }
+    k.glow(s * 0.55, 0.645, RZ, 0.7, 0.42, -1);
+    k.cyl(0.055, 0.055, 0.14, s * 0.1, 0.43, -2.26, M.chrome, 'z', 16, true);
+  });
+  k.decal(0.36, 0.11, 0, 0.54, RZ - 0.025, M.plate, 'z', -1);
+  k.plate([[-0.84, -2.3], [0.84, -2.3], [0.86, -1.7], [-0.86, -1.7]], 0.11, 0.02, M.trim);
+  for (let i = -2; i <= 2; i++) k.box(0.012, 0.2, 0.45, i * 0.26, 0.22, -2.05, M.carbon);
+  // full-width wing rising out of the rear wings
+  k.foil(0.4, 0.1, 1.86, 0, 1.0, -2.02, 0.07, M.paint);
+  sym(s => k.prof([[-2.24, 0.88], [-1.82, 0.93], [-1.84, 1.02], [-2.22, 1.04]], 0.07, s * 0.9, M.paint, 0.02));
+  k.mirrorPod(1.0, 0.84, 0.55, 0.18, 0.08, 0.12);
+  wheelSet(k, body, { ...W, rim: 0.68, style: 'five', rimMat: M.alu, caliper: M.caliperBlack });
+};
+
 /* ================================================================ Hot hatch
  * Modelled on the VW Golf GTI (Mk7.5): 4.28 m long, 1.79 m wide, 1.45 m tall, 2.63 m wheelbase. */
 MODELS.hatch = (k) => {

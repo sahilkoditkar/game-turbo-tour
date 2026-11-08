@@ -44,6 +44,12 @@ export const CARS = [
     shape: 'super',
   },
   {
+    id: 'fiamma', name: 'Fiamma V12', price: 36000,
+    desc: 'Mid-engine V12 targa modelled on the Ferrari F50: covered headlamps, twin bonnet vents, a full-width wing growing out of the rear wings.',
+    stats: { maxSpeed: 79, accel: 25, grip: 8.5, turn: 1.08, brake: 45 },
+    shape: 'v12',
+  },
+  {
     id: 'proto', name: 'Nightfall LMP', price: 32000,
     desc: 'Le Mans Hypercar-class prototype in the mould of the Toyota GR010 and Porsche 963. Massive downforce, giant wing.',
     stats: { maxSpeed: 78, accel: 23, grip: 8.8, turn: 1.1, brake: 46 },
