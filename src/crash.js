@@ -34,6 +34,8 @@ const SPEC = {
   mamba: { m: 1540, hl: 2.25, hw: 0.96 },
   kaze: { m: 1370, hl: 2.2, hw: 0.905 },
   v12: { m: 1230, hl: 2.24, hw: 0.99 },
+  raiden: { m: 1500, hl: 2.26, hw: 0.905 },
+  centro: { m: 1140, hl: 2.15, hw: 0.91 },
 };
 const DEFAULT = { m: 1350, hl: 2.2, hw: 0.93 };
 const MU = 0.35;            // body panel on body panel

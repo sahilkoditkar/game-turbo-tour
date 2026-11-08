@@ -160,9 +160,9 @@ MODELS.v12 = (k) => {
     [-1.33, 0.993, 0.15, 0.63, 0.95, 6, 0.11],
     [-0.70, 0.97, 0.14, 0.58, 0.90, 6, 0.10],
     [0.00, 0.95, 0.14, 0.54, 0.78, 6, 0.06],
-    [0.70, 0.955, 0.14, 0.52, 0.72, 6, 0.07],
-    [1.25, 0.975, 0.14, 0.52, 0.70, 6, 0.13],
-    [1.80, 0.94, 0.13, 0.45, 0.58, 6, 0.09],
+    [0.70, 0.955, 0.14, 0.52, 0.75, 6, 0.1],
+    [1.25, 0.975, 0.14, 0.54, 0.76, 6, 0.17],
+    [1.80, 0.94, 0.13, 0.45, 0.62, 6, 0.11],
     [2.10, 0.84, 0.12, 0.38, 0.47, 5, 0.05],
     [2.24, 0.62, 0.14, 0.32, 0.38, 4],
   ], {
@@ -393,6 +393,147 @@ MODELS.mamba = (k) => {
   wheelSet(k, body, { ...W, rim: 0.7, style: 'ten', rimMat: M.alu, caliper: M.caliperBlack });
 };
 
+/* ================================================================ 90s Japanese GT coupe
+ * Modelled on the Toyota Supra (A80, Mk4): 4.52 m long, 1.81 m wide, 1.28 m tall, 2.55 m
+ * wheelbase, 17-inch wheels. Soft rounded body, long nose with slim lamp clusters over a big
+ * mouth, bubble cabin with a large rear glass, a tall hoop wing and big round tail lamps. */
+MODELS.raiden = (k) => {
+  const M = k.M;
+  k.style = 'arcade';
+  const W = { fz: 1.25, rz: -1.3, fr: 0.318, rr: 0.325, fx: 0.77, rx: 0.775, fw: 0.235, rw: 0.255 };
+  const body = k.loft([
+    [-2.25, 0.78, 0.40, 0.70, 0.86, 4.5],
+    [-2.20, 0.86, 0.34, 0.70, 0.90, 4.5],
+    [-1.95, 0.895, 0.30, 0.70, 0.93, 4.5, 0.02],
+    [-1.30, 0.905, 0.27, 0.68, 0.94, 4.5, 0.04],
+    [-0.60, 0.89, 0.26, 0.66, 0.92, 5, 0.02],
+    [0.20, 0.88, 0.26, 0.64, 0.87, 5, 0.02],
+    [0.90, 0.89, 0.27, 0.63, 0.82, 4.5, 0.03],
+    [1.25, 0.90, 0.27, 0.62, 0.80, 4.5, 0.05],
+    [1.85, 0.87, 0.28, 0.55, 0.70, 4.5, 0.04],
+    [2.17, 0.78, 0.29, 0.48, 0.58, 4, 0.02],
+    [2.27, 0.62, 0.30, 0.42, 0.50, 4],
+  ], {
+    arches: [k.arch(W.fz, W.fr, W.fx, W.fw), k.arch(W.rz, W.rr, W.rx, W.rw)],
+  });
+  k.skin(body, M.paint);
+  archLips(k, body, M.paint, 0.012);
+  const cab = k.loft([
+    [-1.75, 0.60, 0.84, 0.92, 0.94, 3],
+    [-1.40, 0.65, 0.84, 0.93, 1.07, 3],
+    [-0.80, 0.68, 0.82, 0.92, 1.22, 3.2],
+    [-0.30, 0.69, 0.80, 0.91, 1.27, 3.2],
+    [0.10, 0.70, 0.78, 0.89, 1.26, 3.2],
+    [0.45, 0.72, 0.76, 0.86, 1.13, 3],
+    [0.88, 0.76, 0.74, 0.82, 0.84, 3],
+    [0.94, 0.74, 0.74, 0.81, 0.82, 3],
+  ], { n: 32, kb: 22, ka: 3 });
+  k.skin(cab, M.paint);
+  k.top(cab, quad([0.14, -0.6], [0.9, -0.73], [0.14, 0.6], [0.9, 0.73]), M.glass);
+  k.side(cab, quad([-0.88, 0.94], [0.82, 0.85], [-0.58, 1.15], [0.1, 1.21]), M.glass);
+  k.top(cab, quad([-1.7, -0.54], [-0.82, -0.62], [-1.7, 0.54], [-0.82, 0.62]), M.glass);
+  // sides: shut lines, black skirt
+  shut(k, body, 0.86, 0.28, 0.86, -0.04); shut(k, body, -0.62, 0.28, 0.92, 0.03);
+  k.side(body, rect(-0.98, 0.98, 0.27, 0.33), M.trim, { off: 0.006 });
+  // front: slim lamp clusters along the nose, big mouth, fog lamps, lip
+  sym(s => {
+    k.top(body, ellipse(1.98, s * 0.6, 0.22, 0.085, s * -0.28), M.lens, { off: 0.006, nu: 8, nv: 24 });
+    for (const t of [-0.12, 0, 0.12]) k.top(body, ellipse(1.98 + t, s * (0.6 - t * 0.28), 0.032, 0.03), M.lamp, { off: 0.011, nu: 3, nv: 12 });
+    k.fascia(ellipsePts(s * 0.6, 0.38, 0.05, 0.035, 14), 2.24, 1, M.amber, 0.03, [], 0.01);
+  });
+  k.fascia(roundRect(-0.48, 0.32, 0.48, 0.48, 0.07), 2.27, 1, M.grille, 0.05, [], 0.004);
+  k.plate([[-0.76, 2.06], [0.76, 2.06], [0.6, 2.28], [-0.6, 2.28]], 0.29, 0.02, M.trim);
+  // rear: smoked clusters with big round lamps, body-colour centre, plate, single big pipe, diffuser
+  const RZ = -2.25;
+  sym(s => {
+    k.fascia(ellipsePts(s * 0.55, 0.66, 0.29, 0.11, 32), RZ, -1, M.trim, 0.03, [], 0.01);
+    k.fascia(ellipsePts(s * 0.68, 0.66, 0.09, 0.09, 24), RZ, -1, M.tail, 0.03, [], 0.018);
+    k.fascia(ellipsePts(s * 0.43, 0.66, 0.08, 0.08, 24), RZ, -1, M.tail, 0.03, [], 0.018);
+    k.glow(s * 0.55, 0.66, RZ, 0.85, 0.42, -1);
+  });
+  k.decal(0.36, 0.11, 0, 0.5, RZ - 0.02, M.plate, 'z', -1);
+  k.cyl(0.06, 0.06, 0.14, 0.52, 0.3, -2.25, M.chrome, 'z', 16, true);
+  k.fascia(roundRect(-0.62, 0.24, 0.62, 0.36, 0.04), RZ, -1, M.trim, 0.04, [], 0.004);
+  // tall hoop wing: uprights sweep up from the deck to a full-width blade
+  sym(s => k.prof([[-2.17, 0.89], [-1.86, 0.92], [-1.97, 1.17], [-2.13, 1.17]], 0.06, s * 0.7, M.paint, 0.02));
+  k.foil(0.3, 0.1, 1.52, 0, 1.18, -2.05, 0.06, M.paint);
+  k.mirrorPod(0.88, 0.96, 0.66, 0.15, 0.08, 0.12);
+  wheelSet(k, body, { ...W, rim: 0.66, style: 'five', rimMat: M.alu, caliper: M.caliperRed });
+};
+
+/* ================================================================ Central-seat hypercar
+ * Modelled on the McLaren F1: 4.29 m long, 1.82 m wide, 1.14 m tall, 2.72 m wheelbase,
+ * 17-inch wheels. Compact canopy with the roof snorkel, lamp clusters on the nose corners,
+ * big rounded side scoops, a louvred engine cover, rear flap and round lamps in a black tail. */
+MODELS.centro = (k) => {
+  const M = k.M;
+  k.style = 'arcade';
+  const W = { fz: 1.3, rz: -1.42, fr: 0.32, rr: 0.358, fx: 0.77, rx: 0.76, fw: 0.235, rw: 0.315 };
+  const body = k.loft([
+    [-2.17, 0.78, 0.32, 0.66, 0.82, 5.5],
+    [-2.12, 0.87, 0.27, 0.66, 0.86, 5.5],
+    [-1.90, 0.905, 0.22, 0.64, 0.90, 5.5, 0.04],
+    [-1.42, 0.91, 0.17, 0.60, 0.91, 5.5, 0.08],
+    [-0.70, 0.89, 0.15, 0.55, 0.86, 5.5, 0.06],
+    [0.10, 0.875, 0.15, 0.51, 0.74, 5.5, 0.04],
+    [0.80, 0.885, 0.15, 0.52, 0.74, 5.5, 0.1],
+    [1.30, 0.90, 0.15, 0.56, 0.77, 5.5, 0.15],
+    [1.80, 0.86, 0.15, 0.47, 0.64, 5, 0.08],
+    [2.05, 0.76, 0.15, 0.36, 0.44, 4.5, 0.02],
+    [2.12, 0.58, 0.17, 0.31, 0.38, 4],
+  ], {
+    arches: [k.arch(W.fz, W.fr, W.fx, W.fw), k.arch(W.rz, W.rr, W.rx, W.rw)],
+    dents: [{ z0: -1.15, z1: -0.75, y0: 0.34, y1: 0.62, depth: 0.09, s: 0.03 }],
+  });
+  k.skin(body, M.paint);
+  archLips(k, body, M.paint, 0.012);
+  const cab = k.loft([
+    [-1.15, 0.50, 0.74, 0.82, 0.86, 3],
+    [-0.80, 0.58, 0.72, 0.83, 1.02, 3],
+    [-0.35, 0.62, 0.70, 0.82, 1.12, 3.2],
+    [0.05, 0.64, 0.68, 0.80, 1.14, 3.2],
+    [0.40, 0.67, 0.66, 0.77, 1.06, 3],
+    [0.90, 0.72, 0.64, 0.71, 0.74, 3],
+    [0.96, 0.70, 0.64, 0.70, 0.71, 3],
+  ], { n: 32, kb: 22, ka: 3 });
+  k.skin(cab, M.paint);
+  k.top(cab, quad([0.38, -0.58], [0.94, -0.69], [0.38, 0.58], [0.94, 0.69]), M.glass);
+  k.side(cab, quad([-0.78, 0.84], [0.86, 0.74], [-0.56, 1.0], [0.3, 1.08]), M.glass);
+  // roof snorkel feeding the V12, open at its front
+  k.prof([[-0.1, 1.12], [-0.22, 1.172], [-0.9, 1.1], [-1.0, 1.03], [-0.1, 1.03]], 0.2, 0, M.paint, 0.05);
+  k.fascia(roundRect(-0.065, 1.128, 0.065, 1.162, 0.015), -0.22, 1, M.grille, 0.02, [], 0.004);
+  // louvred engine cover, door shut, sill, big rounded side scoops
+  louvres(k, body, -1.98, -1.22, -0.44, 0.44, 8, { mat: M.gloss });
+  shut(k, body, 0.86, 0.2, 0.68, -0.06); shut(k, body, -0.7, 0.2, 0.84, 0.02);
+  k.side(body, rect(-0.98, 0.98, 0.15, 0.22), M.carbon, { off: 0.006 });
+  k.side(body, quad([-1.15, 0.36], [-0.75, 0.36], [-1.12, 0.62], [-0.8, 0.6]), M.grille, { off: 0.002 });
+  // front: lamp clusters on the nose corners, low oval mouth, centre intake, splitter
+  sym(s => {
+    k.top(body, ellipse(1.88, s * 0.6, 0.2, 0.1, s * -0.3), M.lens, { off: 0.006, nu: 8, nv: 24 });
+    for (const t of [-0.1, 0, 0.1]) k.top(body, ellipse(1.88 + t, s * (0.6 - t * 0.3), 0.035, 0.035), M.lamp, { off: 0.011, nu: 3, nv: 12 });
+    k.fascia(ellipsePts(s * 0.55, 0.25, 0.14, 0.055, 18), 2.0, 1, M.grille, 0.05, [], 0.04);
+  });
+  k.fascia(ellipsePts(0, 0.26, 0.28, 0.06, 24), 2.12, 1, M.grille, 0.05, [], 0.004);
+  k.plate([[-0.82, 1.9], [0.82, 1.9], [0.7, 2.1], [-0.7, 2.1]], 0.08, 0.02, M.trim);
+  // rear: black panel, two round lamps each side, centre pipes, plate, diffuser, rear flap
+  const RZ = -2.17;
+  k.fascia(roundRect(-0.82, 0.34, 0.82, 0.76, 0.07), RZ, -1, M.grille, 0.04);
+  sym(s => {
+    for (const x of [0.5, 0.68]) {
+      k.fascia(ellipsePts(s * x, 0.6, 0.088, 0.088, 24), RZ, -1, M.trim, 0.03, [], 0.012);
+      k.fascia(ellipsePts(s * x, 0.6, 0.074, 0.074, 24), RZ, -1, M.tail, 0.03, [], 0.02);
+    }
+    k.glow(s * 0.59, 0.6, RZ, 0.6, 0.36, -1);
+    k.cyl(0.05, 0.05, 0.12, s * 0.09, 0.44, -2.19, M.chrome, 'z', 14, true);
+  });
+  k.decal(0.34, 0.1, 0, 0.62, RZ - 0.03, M.plate, 'z', -1);
+  k.plate([[-0.8, -2.22], [0.8, -2.22], [0.82, -1.7], [-0.82, -1.7]], 0.12, 0.02, M.trim);
+  for (let i = -2; i <= 2; i++) k.box(0.012, 0.18, 0.4, i * 0.26, 0.22, -2.0, M.carbon);
+  k.foil(0.26, 0.09, 1.36, 0, 0.885, -2.0, 0.12, M.paint);
+  k.mirrorPod(0.95, 0.8, 0.62, 0.16, 0.075, 0.11);
+  wheelSet(k, body, { ...W, rim: 0.7, style: 'five', rimMat: M.alu, caliper: M.caliperBlack });
+};
+
 /* ================================================================ Mid-engine coupe
  * Modelled on the 1991 Honda NSX: 4.41 m long, 1.81 m wide, 1.17 m tall, 2.53 m wheelbase,
  * 15/16-inch wheels. Low pointed nose with closed pop-up lamps, a cockpit set forward under
@@ -409,9 +550,9 @@ MODELS.kaze = (k) => {
     [-1.29, 0.905, 0.23, 0.60, 0.88, 6, 0.04],
     [-0.60, 0.89, 0.21, 0.56, 0.84, 6, 0.03],
     [0.20, 0.885, 0.21, 0.54, 0.76, 6, 0.02],
-    [0.80, 0.89, 0.21, 0.52, 0.70, 6, 0.03],
-    [1.24, 0.90, 0.21, 0.50, 0.66, 6, 0.05],
-    [1.80, 0.87, 0.21, 0.44, 0.56, 6, 0.04],
+    [0.80, 0.89, 0.21, 0.52, 0.72, 6, 0.05],
+    [1.24, 0.90, 0.21, 0.52, 0.715, 6, 0.08],
+    [1.80, 0.87, 0.21, 0.44, 0.585, 6, 0.05],
     [2.12, 0.78, 0.22, 0.38, 0.46, 5, 0.02],
     [2.22, 0.60, 0.24, 0.33, 0.40, 4],
   ], {

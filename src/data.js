@@ -8,6 +8,12 @@ export const CARS = [
     shape: 'classic',
   },
   {
+    id: 'raiden', name: 'Raiden RZ', price: 4500,
+    desc: 'Twin-turbo 90s Japanese GT modelled on the Toyota Supra Mk4: soft curves, a tall hoop wing and big round tail lamps. A cheap first step up that loves upgrades.',
+    stats: { maxSpeed: 62, accel: 18, grip: 7.2, turn: 1.06, brake: 38 },
+    shape: 'raiden',
+  },
+  {
     id: 'muscle', name: 'Thunder V8', price: 9000,
     desc: 'A \'67 Mustang-style fastback with twin racing stripes. Monster straight-line speed, needs respect in the corners.',
     stats: { maxSpeed: 68, accel: 21, grip: 6.4, turn: 0.96, brake: 36 },
@@ -54,6 +60,12 @@ export const CARS = [
     desc: 'Mid-engine V12 targa modelled on the Ferrari F50: covered headlamps, twin bonnet vents, a full-width wing growing out of the rear wings.',
     stats: { maxSpeed: 79, accel: 25, grip: 8.5, turn: 1.08, brake: 45 },
     shape: 'v12',
+  },
+  {
+    id: 'centro', name: 'Centro GT', price: 50000,
+    desc: 'Central-seat V12 hypercar modelled on the McLaren F1: roof snorkel, compact canopy, big side scoops and round lamps in a black tail. The fastest thing with number plates.',
+    stats: { maxSpeed: 85, accel: 26, grip: 9.0, turn: 1.12, brake: 47 },
+    shape: 'centro',
   },
   {
     id: 'formula', name: 'Turbo F1', price: 60000,

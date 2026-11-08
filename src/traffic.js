@@ -6,7 +6,7 @@ import { buildCarMesh, setBrakeLights } from './carmodels.js';
 import { mulberry32 } from './world.js';
 import { specOf, contact, resolve, applyToCar, carBody } from './crash.js';
 
-const SHAPES = ['pony', 'kaze', 'classic', 'muscle', 'pony', 'kaze', 'mamba', 'super'];
+const SHAPES = ['pony', 'raiden', 'kaze', 'classic', 'muscle', 'raiden', 'pony', 'kaze', 'mamba', 'super'];
 const COLORS = [0xd9d9df, 0x2b2e36, 0x8c939e, 0xb52a2a, 0x1f4e9c, 0xe6e6e6, 0x3f3f46, 0x6c8f3a, 0xc27a1a, 0x7a2d6d];
 const KIND_SPEED = { highway: 29, road: 22, lane: 17, dirt: 12, street: 13 };
 const SPAWN_MIN = 200, SPAWN_MAX = 520, DESPAWN = 640;
