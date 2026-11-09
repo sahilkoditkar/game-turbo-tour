@@ -1055,6 +1055,86 @@ function instanceMaterials(color, style) {
   return { paint, accent, accent2, tail, glow, plate, num };
 }
 
+/* ------------------------------------------------------------------ distant cars */
+
+const LITE = new Map();
+/**
+ * One merged geometry per shape for cars seen from a distance: every part of the low-detail
+ * model (wheels included, standing still) in a single mesh, each vertex carrying its part's
+ * colour, and a role (1 paint, 2 accent, 3 darker paint) so the paint stays per car.
+ */
+function liteGeometry(shape) {
+  if (LITE.has(shape)) return LITE.get(shape);
+  const root = template(shape, 'low');
+  root.updateMatrixWorld(true);
+  const inv = root.matrixWorld.clone().invert();
+  const parts = [];
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const mat = o.material, role = mat.userData.role;
+    if (role === 'glow' || role === 'num' || mat.transparent && mat.opacity < 0.5) return;
+    const g = o.geometry, P = g.attributes.position;
+    if (!P) return;
+    const col = new THREE.Color(mat.color || 0xffffff);
+    if (mat.emissive && mat.emissiveIntensity > 0.5) col.copy(mat.emissive).multiplyScalar(Math.min(1.4, mat.emissiveIntensity * 0.6));   // lamps read bright
+    if (role === 'plate') col.set(0xeeeeee);
+    parts.push({ g, m: new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld), col, roleId: { paint: 1, accent: 2, accent2: 3 }[role] || 0 });
+  });
+  let nv = 0, ni = 0;
+  for (const { g } of parts) { nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
+  const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), colA = new Float32Array(nv * 3), roleA = new Float32Array(nv), idx = new Uint32Array(ni);
+  const v = new THREE.Vector3(), nm = new THREE.Matrix3();
+  let vo = 0, io = 0;
+  for (const { g, m, col, roleId } of parts) {
+    if (!g.attributes.normal) g.computeVertexNormals();
+    nm.getNormalMatrix(m);
+    const P = g.attributes.position, N = g.attributes.normal, flip = m.determinant() < 0;
+    for (let i = 0; i < P.count; i++) {
+      v.fromBufferAttribute(P, i).applyMatrix4(m); pos.set([v.x, v.y, v.z], (vo + i) * 3);
+      v.fromBufferAttribute(N, i).applyMatrix3(nm).normalize(); nor.set([v.x, v.y, v.z], (vo + i) * 3);
+      colA.set([col.r, col.g, col.b], (vo + i) * 3); roleA[vo + i] = roleId;
+    }
+    const I = g.index, cnt = I ? I.count : P.count;
+    for (let t = 0; t < cnt; t += 3) {
+      const a = I ? I.getX(t) : t, b = I ? I.getX(t + 1) : t + 1, c = I ? I.getX(t + 2) : t + 2;
+      idx[io++] = a + vo; idx[io++] = (flip ? c : b) + vo; idx[io++] = (flip ? b : c) + vo;
+    }
+    vo += P.count;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colA, 3));
+  geo.setAttribute('aRole', new THREE.BufferAttribute(roleA, 1));
+  geo.setIndex(new THREE.BufferAttribute(idx, 1));
+  geo.computeBoundingSphere();
+  geo.userData.shared = true;
+  LITE.set(shape, geo);
+  return geo;
+}
+
+/**
+ * A car as one draw call, for traffic further away (a full car is one call per material,
+ * dozens per car). Same paint and livery colours as buildCarMesh; no moving wheels or brake lights.
+ */
+export function buildCarLite(shape, color) {
+  const c = new THREE.Color(color);
+  const hsl = {}; c.getHSL(hsl, THREE.SRGBColorSpace);
+  const light = hsl.l > 0.62 || (hsl.h > 0.1 && hsl.h < 0.2 && hsl.l > 0.45);
+  const u = { uPaint: { value: c }, uAccent: { value: new THREE.Color(light ? 0x15171c : 0xf3f3f1) }, uAccent2: { value: c.clone().offsetHSL(0, 0, light ? -0.3 : -0.18) } };
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.15 });
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = 'attribute float aRole;\nvarying float vRole;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vRole = aRole;');
+    sh.fragmentShader = 'uniform vec3 uPaint;\nuniform vec3 uAccent;\nuniform vec3 uAccent2;\nvarying float vRole;\n' + sh.fragmentShader.replace('#include <color_fragment>',
+      '#include <color_fragment>\n  if (vRole > 0.5) diffuseColor.rgb = vRole < 1.5 ? uPaint : vRole < 2.5 ? uAccent : uAccent2;');
+  };
+  mat.customProgramCacheKey = () => 'car-lite';
+  const mesh = new THREE.Mesh(liteGeometry(shape), mat);
+  mesh.userData = { wheels: [], frontWheels: [], brakeLights: [], body: null, lite: true };
+  return mesh;
+}
+
 /**
  * Free what one car from buildCarMesh owns: its paint, livery, lamp and glow materials and
  * its number-plate textures. The geometry and the other materials belong to the shared model
@@ -1064,6 +1144,7 @@ export function disposeCarMesh(mesh) {
   const seen = new Set();
   mesh.traverse((o) => {
     if (!o.isMesh) return;
+    if (o.userData.lite) { o.material.dispose(); return; }
     for (const m of [].concat(o.material)) {
       if (!m || seen.has(m) || !m.userData.role) continue;
       seen.add(m);

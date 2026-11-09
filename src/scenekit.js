@@ -41,7 +41,7 @@ export function aimSun(sun, focus) {
   sun.target.position.copy(focus);
 }
 
-/** Cheap procedural environment map so paint and glass have reflections. */
+/** Cheap procedural environment map so paint and glass have reflections. Free it with disposeEnvironment(). */
 export function buildEnvironment(renderer, th) {
   const env = new THREE.Scene();
   const skyMat = new THREE.ShaderMaterial({
@@ -55,9 +55,35 @@ export function buildEnvironment(renderer, th) {
   sunDisc.position.set(20, 30, 14);
   env.add(sunDisc);
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const tex = pmrem.fromScene(env, 0.04).texture;
+  const rt = pmrem.fromScene(env, 0.04);
   pmrem.dispose();
-  return tex;
+  env.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+  rt.texture.userData.renderTarget = rt;   // free it with disposeEnvironment(): the texture alone can't release a render target
+  return rt.texture;
+}
+
+/**
+ * Free everything a scene holds on the GPU when a race or the open world closes: geometry,
+ * every texture a material uses (map, emissiveMap, ...), the materials, and the lights'
+ * shadow maps. Shared car-model geometry freed here is simply uploaded again when next used.
+ */
+export function disposeScene(root) {
+  root.traverse((o) => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.isLight && o.dispose) o.dispose();
+    if (!o.material) return;
+    for (const m of [].concat(o.material)) {
+      for (const k of Object.keys(m)) if (m[k] && m[k].isTexture) m[k].dispose();
+      if (m.uniforms) for (const u of Object.values(m.uniforms)) if (u && u.value && u.value.isTexture) u.value.dispose();
+      m.dispose();
+    }
+  });
+}
+
+/** Free an environment map from buildEnvironment (its render target, not just the texture). */
+export function disposeEnvironment(tex) {
+  if (!tex) return;
+  if (tex.userData.renderTarget) tex.userData.renderTarget.dispose(); else tex.dispose();
 }
 
 /**
