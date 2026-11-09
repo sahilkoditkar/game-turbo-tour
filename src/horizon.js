@@ -867,7 +867,7 @@ export class Horizon {
     if (m.kind === 'zone') return P.zones[m.id] ? `${P.zones[m.id]} km/h avg · ${this._starStr(this._stars(P.zones[m.id], m.stars))}` : 'Not set';
     if (m.kind === 'event') return P.events[m.id] ? `Best finish: P${P.events[m.id]}` : 'Not raced yet';
     if (m.kind === 'series') return this.seriesStatus(m.series).text;
-    if (m.kind === 'garage') return { hq: 'Buy cars, choose, upgrade, paint', dealer: 'Buy cars', tuning: 'Upgrade your car' }[m.type];
+    if (m.kind === 'garage') return { hq: 'Your cars: switch, paint, upgrade', dealer: 'Browse and buy cars', tuning: 'Upgrade your car' }[m.type];
     return '';
   }
 

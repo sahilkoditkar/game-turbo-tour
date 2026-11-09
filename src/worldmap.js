@@ -664,7 +664,7 @@ export class WorldMap {
   _kindName(m) {
     return {
       hub: 'Festival hub', trap: 'Speed trap', drift: 'Drift zone', zone: 'Speed zone', board: 'Bonus board', custom: m.name,
-      series: 'Championship', garage: { hq: 'Garage · buy, choose, upgrade, paint', dealer: 'Dealership · buy cars', tuning: 'Tuning shop · upgrades' }[m.type] || 'Garage',
+      series: 'Championship', garage: { hq: 'Garage · switch car, paint, upgrade', dealer: 'Dealership · buy cars', tuning: 'Tuning shop · upgrades' }[m.type] || 'Garage',
       event: m.track ? (m.track.kind === 'stage' ? 'Point-to-point stage' : 'Circuit race') : 'Event',
     }[m.kind];
   }

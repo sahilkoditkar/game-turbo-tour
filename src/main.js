@@ -4,6 +4,7 @@ import { AudioSystem } from './audio.js';
 import { UI } from './ui.js';
 import { Race } from './race.js';
 import { Horizon } from './horizon.js';
+import { GarageStage } from './garage3d.js';
 import { EVENT_PRIZE } from './worlddef.js';
 import { getTrack } from './tracks.js';
 import { getCar, getSeries, PLAYER_COLORS, effectiveStats } from './data.js';
@@ -148,7 +149,8 @@ class App {
           this.horizon.update(dt);
           if (this.horizon.requestMap) { this.horizon.requestMap = false; this.openMap(); }
         }
-        this.horizon.render();
+        if (this.garage3d) { this.garage3d.update(dt); this.garage3d.render(); }   // inside a garage: its room instead of the island
+        else this.horizon.render();
       }
     } else if (this.idle) {
       this.idle.t += dt;
@@ -212,7 +214,13 @@ class App {
   /** A garage in the world: Festival HQ (everything), the dealership (buy) or a tuning shop (upgrades). */
   openGarage(marker = this.horizon && this.horizon.world.garages[0]) {
     const hz = this.horizon;
-    this._worldPanel((close) => this.ui.garage({ inWorld: true, mode: marker.type, name: marker.name, onClose: close }), () => { hz.swapCar(); hz.onGarageClosed(); });
+    if (this.garage3d) this.garage3d.dispose();
+    this.garage3d = new GarageStage(this.renderer, marker.type);
+    document.body.classList.add('in-garage');   // hides the driving HUD
+    this._worldPanel((close) => this.ui.garage({ inWorld: true, mode: marker.type, name: marker.name, stage: this.garage3d, onClose: close }), () => {
+      this._closeGarageStage();
+      hz.swapCar(); hz.onGarageClosed();
+    });
   }
 
   openSeries(marker) {
@@ -299,7 +307,13 @@ class App {
     this.ui.mainMenu();
   }
 
+  _closeGarageStage() {
+    if (this.garage3d) { this.garage3d.dispose(); this.garage3d = null; }
+    document.body.classList.remove('in-garage');
+  }
+
   disposeHorizon() {
+    this._closeGarageStage();
     if (this.horizon) { this.horizon.dispose(); this.horizon = null; }
     this.renderer.setScissorTest(false);
     this.renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);

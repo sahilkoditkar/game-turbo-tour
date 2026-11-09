@@ -1,7 +1,7 @@
 import { TRACKS, getTrack } from './tracks.js';
-import { CARS, SERIES, UPGRADES, PLAYER_COLORS, getCar, getSeries, upgradeCost, effectiveStats } from './data.js';
+import { CARS, SERIES, UPGRADES, PLAYER_COLORS, PAINT_NAMES, PAINT_COST, getCar, getSeries, upgradeCost, effectiveStats } from './data.js';
 import { listControls, getControl, connectedPads, gamepadDiagnostics } from './input.js';
-import { seriesState, seriesLock, standings, canBuyUpgrade } from './career.js';
+import { seriesState, seriesLock, standings, canBuyUpgrade, paintOf, setPaint } from './career.js';
 import { levelForXp } from './worlddef.js';
 import { fmtTime } from './race.js';
 import { WorldMap } from './worldmap.js';
@@ -85,19 +85,23 @@ export class UI {
     this.setTitle(this._title);
   }
 
+  /** Remove listeners the last screen added outside its own DOM (e.g. the garage's arrow keys). */
+  _cleanupScreen() { if (this._screenCleanup) { const f = this._screenCleanup; this._screenCleanup = null; f(); } }
+
   hide() {
     if (this.worldMap) { this.worldMap.dispose(); this.worldMap = null; }
-    this.el.innerHTML = ''; this.el.classList.add('empty'); this.el.classList.remove('fullbleed'); this.rerender = null; this.mapOpen = false;
+    this._cleanupScreen();
+    this.el.innerHTML = ''; this.el.className = 'screen empty'; this.rerender = null; this.mapOpen = false;
     this.closeAbout();
     // the caller usually starts or resumes a race / the world right after hiding the menu
     queueMicrotask(() => { if (this.el.classList.contains('empty')) this.setTitle(this._liveTitle()); });
   }
 
-  show(html, { transparent = false, title } = {}) {
+  show(html, { transparent = false, title, cls = '' } = {}) {
     if (this.worldMap) { this.worldMap.dispose(); this.worldMap = null; }
+    this._cleanupScreen();
     if (title !== undefined) this.setTitle(title);
-    this.el.classList.remove('empty', 'fullbleed');
-    this.el.classList.toggle('transparent', transparent);
+    this.el.className = 'screen' + (transparent ? ' transparent' : '') + (cls ? ' ' + cls : '');
     this.el.innerHTML = html;
     this.el.querySelectorAll('button').forEach(b => b.addEventListener('click', () => this.app.audio.click()));
   }
@@ -312,64 +316,146 @@ export class UI {
 
   // ------------------------------------------------------------ Garage
   /**
-   * A garage in the world. opts.mode: 'hq' (Festival HQ: paint, choose and buy cars,
-   * upgrades), 'dealer' (buy cars; a new car is the one you drive away in) or 'tuning'
-   * (upgrades for the car you came in). opts.onClose drives away.
+   * A garage in the world, drawn over its 3D room (opts.stage, a GarageStage): the car on a
+   * turntable, a side panel and a strip of cars along the bottom. opts.mode:
+   *  'dealer' (Turbo Motors: every car, pick a colour, buy; a new car is the one you drive away in),
+   *  'hq'     (Festival HQ: your own cars only: switch car, paint, upgrades; no buying),
+   *  'tuning' (upgrades for the car you came in).
+   * opts.onClose drives away.
    */
   garage(opts = {}) {
-    const app = this.app, p = app.profile;
+    const app = this.app, p = app.profile, stage = opts.stage;
     const mode = opts.mode || 'hq';
     this.rerender = null;
-    const sel = getCar(p.selected);
-    const lv = p.upgrades[sel.id] || {};
-    const again = () => this.garage(opts);
     const eyebrow = { hq: 'Garage', dealer: 'Dealership', tuning: 'Tuning shop' }[mode];
     const elsewhere = {
-      hq: '',
-      dealer: 'Upgrades at a tuning shop or Festival HQ · paint and switching cars at Festival HQ.',
-      tuning: 'Buy cars at Turbo Motors or Festival HQ · paint and switching cars at Festival HQ.',
+      hq: 'New cars are sold at Turbo Motors in Turbo City. Tuning shops do upgrades too.',
+      dealer: 'Paint, switch cars and upgrade at Festival HQ · upgrades at any tuning shop.',
+      tuning: 'Switch cars and paint at Festival HQ · buy new cars at Turbo Motors.',
     }[mode];
-    const carCard = (c) => {
-      const owned = p.cars.includes(c.id);
-      return `<div class="card ${c.id === p.selected ? 'selected' : ''}">
-        <div class="row between"><h4>${c.name}</h4>${owned ? (c.id === p.selected ? '<span class="badge gold">Driving</span>' : '<span class="badge done">Owned</span>') : `<span class="badge">${money(c.price)}</span>`}</div>
-        <div class="meta" style="margin-bottom:8px">${c.desc}</div>
-        ${this._statBars(effectiveStats(c, p.upgrades[c.id] || {}))}
-        <div class="row end" style="margin-top:8px">
-          ${owned && c.id !== p.selected && mode === 'hq' ? `<button class="small" data-select="${c.id}">Drive this one</button>` : ''}
-          ${!owned ? `<button class="small primary" data-buy="${c.id}" ${p.money < c.price ? 'disabled' : ''}>Buy · ${money(c.price)}</button>` : ''}
-        </div></div>`;
+    // what the strip offers: the dealer every car, Festival HQ the ones you own, a tuning shop the one you came in
+    const listFor = () => mode === 'dealer' ? CARS : mode === 'hq' ? CARS.filter(c => p.cars.includes(c.id)) : [getCar(p.selected)];
+    const st = { carId: p.selected, preview: {} };
+    // showroom paint for cars you don't own yet: a different colour on each so the floor looks stocked
+    const dealerPaint = (c) => CARS.indexOf(c) % PLAYER_COLORS.length;
+    // st.preview: a colour tried on the turntable (dealer: the one you'll buy in; Festival HQ: not paid for until you respray)
+    const paintFor = (c) => st.preview[c.id] ?? (p.cars.includes(c.id) ? paintOf(p, c.id) : dealerPaint(c));
+    const pips = (lvl, max) => `<span class="gx-pips">${Array.from({ length: max }, (_, i) => `<i class="${i < lvl ? 'on' : ''}"></i>`).join('')}</span>`;
+    const chips = (active, attr) => `<div class="chips gx-paint">${PLAYER_COLORS.map((c, ci) => `<div class="swatch ${active === ci ? 'active' : ''}" ${attr}="${ci}" style="background:${hex(c)}" title="${PAINT_NAMES[ci]}"></div>`).join('')}</div>`;
+    const upgrades = (car) => {
+      const lv = p.upgrades[car.id] || {};
+      return `<h3>Upgrades</h3><div class="gx-ups">${UPGRADES.map(u => {
+        const lvl = lv[u.id] || 0, r = canBuyUpgrade(p, car.id, u.id);
+        return `<div class="gx-up"><div><b>${u.name}</b> ${pips(lvl, u.maxLevel)}<div class="meta">${u.desc}</div></div>
+          ${r.reason === 'MAX' ? '<span class="badge gold">MAX</span>' : `<button class="small primary" data-up="${u.id}" ${r.ok ? '' : 'disabled'}>${money(r.cost)}</button>`}</div>`;
+      }).join('')}</div>`;
     };
-    const upgrades = `<h3>Upgrades — ${sel.name}</h3>
-      <div class="grid-2">
-        ${UPGRADES.map(u => {
-          const lvl = lv[u.id] || 0;
-          const r = canBuyUpgrade(p, sel.id, u.id);
-          return `<div class="card"><div class="row between"><h4>${u.name} <span class="badge">Lv ${lvl}/${u.maxLevel}</span></h4>
-            ${r.reason === 'MAX' ? '<span class="badge gold">MAX</span>' : `<button class="small primary" data-up="${u.id}" ${r.ok ? '' : 'disabled'}>Upgrade · ${money(r.cost)}</button>`}</div>
-            <div class="meta">${u.desc}</div>
-            <div class="stat-bar" style="margin-top:8px"><i style="width:${(lvl / u.maxLevel) * 100}%"></i></div></div>`;
-        }).join('')}
-      </div>`;
-    const cars = (list) => `<h3>${mode === 'dealer' ? 'Cars for sale' : 'Cars'}</h3><div class="grid-2">${list.map(carCard).join('')}</div>`;
-    const body = mode === 'dealer' ? cars(CARS.filter(c => c.price > 0))
-      : mode === 'tuning' ? `<div class="card" style="margin-top:12px"><h4>${sel.name} <span class="badge gold">Driving</span></h4>${this._statBars(effectiveStats(sel, lv))}</div>${upgrades}`
-      : `<h3>Paint</h3>
-        <div class="chips">${PLAYER_COLORS.map((c, ci) => `<div class="swatch ${(p.colorIndex || 0) === ci ? 'active' : ''}" data-paint="${ci}" style="background:${hex(c)}" title="Paint"></div>`).join('')}</div>
-        ${cars(CARS)}${upgrades}`;
-    this.show(`
-      <div class="panel">
-        <div class="row between"><div><div class="meta eyebrow">${eyebrow}</div><h2 style="margin:2px 0 0">${opts.name || 'Festival HQ'}</h2></div>
-          <div style="text-align:right"><div class="money" style="font-size:24px">${money(p.money)}</div><div class="meta">your wallet · earned everywhere on the island</div></div></div>
-        ${body}
-        ${elsewhere ? `<div class="meta" style="margin-top:12px">${elsewhere}</div>` : ''}
-        <div class="row end" style="margin-top:16px"><button class="primary" data-back style="min-width:240px">Drive away in the ${sel.name} <kbd>Esc</kbd></button></div>
-      </div>`, { title: eyebrow });
-    this.on('[data-back]', 'click', () => (opts.onClose ? opts.onClose() : this.mainMenu()));
-    this.on('[data-paint]', 'click', (e, el) => { p.colorIndex = +el.dataset.paint; app.save(); again(); });
-    this.on('[data-select]', 'click', (e, el) => { p.selected = el.dataset.select; app.save(); again(); });
-    this.on('[data-buy]', 'click', (e, el) => { if (app.buyCar(el.dataset.buy)) { this.toast(`Bought ${getCar(el.dataset.buy).name}! It's the one you'll drive away in.`); } again(); });
-    this.on('[data-up]', 'click', (e, el) => { if (app.buyUpgrade(sel.id, el.dataset.up)) this.toast('Upgrade installed'); again(); });
+
+    const render = () => {
+      const list = listFor();
+      if (!list.some(c => c.id === st.carId)) st.carId = list[0].id;
+      const car = getCar(st.carId), sel = getCar(p.selected);
+      const owned = p.cars.includes(car.id), driving = car.id === p.selected;
+      const paint = paintFor(car);
+      if (stage) stage.show(car.shape, PLAYER_COLORS[paint]);
+      const badge = driving ? '<span class="badge gold">Driving</span>' : owned ? '<span class="badge done">Owned</span>' : `<span class="badge">${money(car.price)}</span>`;
+      let section = '';
+      if (mode === 'dealer') {
+        section = owned
+          ? `<div class="gx-note">${driving ? 'You are driving this one.' : 'In your garage. Switch to it at Festival HQ.'}</div>`
+          : `<h3>Colour · <span class="gx-pname">${PAINT_NAMES[paint]}</span></h3>${chips(paint, 'data-preview')}
+             <button class="primary gx-buy" data-buy="${car.id}" ${p.money < car.price ? 'disabled' : ''}>Buy · ${money(car.price)}</button>
+             ${p.money < car.price ? `<div class="gx-note">You need ${money(car.price - p.money)} more. Win events and championships to earn it.</div>` : ''}`;
+      } else if (mode === 'hq') {
+        const trying = paint !== paintOf(p, car.id);
+        section = `${driving ? '' : `<button class="primary gx-buy" data-select="${car.id}">Drive this one</button>`}
+          <h3>Paint · <span class="gx-pname">${PAINT_NAMES[paint]}</span>${trying ? '<span class="gx-cost">preview</span>' : `<span class="gx-cost">respray ${money(PAINT_COST)}</span>`}</h3>${chips(paint, 'data-paint')}
+          ${trying ? `<div class="gx-respray">
+              <button class="primary" data-respray ${p.money < PAINT_COST ? 'disabled' : ''}>Respray · ${money(PAINT_COST)}</button>
+              <button class="ghost" data-unpaint>Cancel</button></div>
+            <div class="gx-note">${p.money < PAINT_COST ? `You need ${money(PAINT_COST - p.money)} more for a respray.` : `Now ${PAINT_NAMES[paintOf(p, car.id)]}. Pick a colour to try it, then respray to keep it.`}</div>` : ''}
+          ${upgrades(car)}`;
+      } else {
+        section = upgrades(car);
+      }
+      const strip = list.length > 1 ? `<div class="gx-strip">
+          <button class="small gx-arrow" data-step="-1" aria-label="Previous car">‹</button>
+          <div class="gx-cars">${list.map(c => {
+            const own = p.cars.includes(c.id);
+            const sub = c.id === p.selected ? 'Driving' : own ? 'Owned' : money(c.price);
+            return `<button class="gx-car ${c.id === car.id ? 'on' : ''}" data-car="${c.id}"><b>${c.name}</b><span>${sub}</span></button>`;
+          }).join('')}</div>
+          <button class="small gx-arrow" data-step="1" aria-label="Next car">›</button></div>` : '';
+      this.show(`
+        <div class="gx gx-${mode}">
+          <div class="gx-top">
+            <div><div class="meta eyebrow">${eyebrow}</div><h2>${opts.name || 'Festival HQ'}</h2></div>
+            <div class="gx-wallet"><div class="money">${money(p.money)}</div><div class="meta">your wallet</div></div>
+          </div>
+          <div class="gx-side">
+            <div class="row between gx-head"><h1>${car.name}</h1>${badge}</div>
+            <p class="gx-desc">${car.desc}</p>
+            ${this._statBars(effectiveStats(car, p.upgrades[car.id] || {}))}
+            ${section}
+            <div class="meta gx-else">${elsewhere}</div>
+          </div>
+          <div class="gx-bottom">
+            ${strip}
+            <div class="gx-actions"><span class="meta gx-hint">Drag to turn the car · scroll to zoom${list.length > 1 ? ' · <kbd>←</kbd> <kbd>→</kbd> change car' : ''}</span>
+              <button class="primary" data-back>Drive away in the ${sel.name} <kbd>Esc</kbd></button></div>
+          </div>
+        </div>`, { title: eyebrow, transparent: true, cls: 'garage3d' });
+      const on = this.el.querySelector('.gx-car.on');
+      if (on) on.scrollIntoView({ block: 'nearest', inline: 'center' });
+      this._frameGarageCar(stage);
+      // changing car at Festival HQ drops any colour you were only trying (nothing was paid)
+      const goTo = (id) => { if (mode === 'hq') st.preview = {}; st.carId = id; render(); };
+      const step = (d) => { const i = list.findIndex(c => c.id === st.carId); goTo(list[(i + d + list.length) % list.length].id); };
+      const keys = (e) => {
+        if (e.code === 'ArrowLeft' || e.code === 'KeyA') step(-1);
+        else if (e.code === 'ArrowRight' || e.code === 'KeyD') step(1);
+      };
+      const reframe = () => this._frameGarageCar(stage);
+      if (list.length > 1) addEventListener('keydown', keys);
+      addEventListener('resize', reframe);
+      this._screenCleanup = () => { removeEventListener('keydown', keys); removeEventListener('resize', reframe); };
+      this.on('[data-back]', 'click', () => (opts.onClose ? opts.onClose() : this.mainMenu()));
+      this.on('[data-car]', 'click', (e, el) => goTo(el.dataset.car));
+      this.on('[data-step]', 'click', (e, el) => step(+el.dataset.step));
+      this.on('[data-preview]', 'click', (e, el) => { st.preview[car.id] = +el.dataset.preview; render(); });
+      this.on('[data-paint]', 'click', (e, el) => {   // try a colour: free, only on the turntable
+        const ci = +el.dataset.paint;
+        if (ci === paintOf(p, car.id)) delete st.preview[car.id]; else st.preview[car.id] = ci;
+        render();
+      });
+      this.on('[data-unpaint]', 'click', () => { delete st.preview[car.id]; render(); });
+      this.on('[data-respray]', 'click', () => {
+        if (!setPaint(p, car.id, paint)) { this.toast(`A respray costs ${money(PAINT_COST)}`); return; }
+        delete st.preview[car.id];
+        this.toast(`Resprayed ${PAINT_NAMES[paint]} · −${money(PAINT_COST)}`);
+        if (car.id === p.selected) app._refreshIdleCars();
+        render();
+      });
+      this.on('[data-select]', 'click', (e, el) => { p.selected = el.dataset.select; app.save(); app._refreshIdleCars(); render(); });
+      this.on('[data-buy]', 'click', () => {
+        if (app.buyCar(car.id, paint)) this.toast(`Bought the ${car.name}! It's the one you'll drive away in.`);
+        render();
+      });
+      this.on('[data-up]', 'click', (e, el) => { if (app.buyUpgrade(car.id, el.dataset.up)) this.toast('Upgrade installed'); render(); });
+    };
+    render();
+  }
+
+  /** Tell the garage's 3D room which part of the screen the menus cover, so the car is framed in the rest. */
+  _frameGarageCar(stage) {
+    if (!stage) return;
+    const side = this.el.querySelector('.gx-side'), bottom = this.el.querySelector('.gx-bottom');
+    if (!side) return;
+    const r = side.getBoundingClientRect(), b = bottom ? bottom.getBoundingClientRect() : { top: innerHeight };
+    // same breakpoint as the .gx layout in style.css: side panel on the left, or a sheet along the bottom
+    const narrow = matchMedia('(max-width: 900px), (max-height: 520px) and (max-width: 1100px)').matches;
+    if (!narrow) stage.setInset(r.right, innerHeight - b.top);
+    else stage.setInset(0, innerHeight - Math.min(r.top, b.top));
   }
 
   // ------------------------------------------------------------ Settings
@@ -479,14 +565,14 @@ export class UI {
       <div class="panel">
         <div class="row between"><h2>Turbo Tour</h2><button class="small ghost" data-back>← Back</button></div>
         <p>Your career is the island. Race drive-up events, take on the four championships at their venues, hunt speed traps, drift zones and bonus boards,
-        and spend what you win at Festival HQ, the garage next to the festival start.</p>
+        and spend what you win on new cars at Turbo Motors in Turbo City and on upgrades at Festival HQ or the tuning shops.</p>
         ${this._walletBar()}
         <div class="grid-2">
           <div class="card">
             <h4>Your car: ${car.name}</h4>
             <div class="meta">${car.desc}</div>
             ${this._statBars(effectiveStats(car, p.upgrades[car.id] || {}))}
-            <div class="meta" style="margin-top:6px">Buy, upgrade and paint cars at Festival HQ (or pause → Go to garage).</div>
+            <div class="meta" style="margin-top:6px">Buy cars at Turbo Motors in Turbo City · switch, paint and upgrade them at Festival HQ (or pause → Go to garage).</div>
           </div>
           <div class="card">
             <h4>Championships</h4>

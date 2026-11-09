@@ -50,11 +50,12 @@ website, so it is hosted directly on GitHub Pages (or any static host).
   ones need a level as well as a result in the series before (Pro Series: Rookie Cup and level 5;
   Grand Prix: level 8; Legends: level 12). Every money popup says where it went ("+1,200 cr → wallet"),
   and the HUD shows level, XP to the next level and the wallet.
-- **Garages you drive to**: **Festival HQ**, next to the festival start, does everything (buy, choose,
-  upgrade, paint); the **Turbo Motors** dealership on Grand Avenue is a glass showroom with real cars
-  on turntables where you browse and buy; **Red Mesa Tuning** and **Shoreline Tuning** do upgrades. Drive
-  onto a garage's pad and press Enter; you leave in whatever car you picked, with no trip back to a
-  menu. All of them show on the map and radar, unlock fast travel once discovered (Festival HQ from
+- **Garages you drive to**, each one a 3D room with your car on a turntable (drag to turn it, scroll
+  or pinch to zoom, ← → to change car): the **Turbo Motors** dealership on Grand Avenue is a glass
+  showroom with all twelve cars, where you try them in any of twelve colours and buy; **Festival HQ**,
+  next to the festival start, is your own garage (switch between the cars you own, paint each one,
+  upgrade); **Red Mesa Tuning** and **Shoreline Tuning** upgrade the car you drive in. Drive onto a
+  garage's pad and press Enter; you leave in whatever car you picked, with no trip back to a menu. All of them show on the map and radar, unlock fast travel once discovered (Festival HQ from
   the start), and the map's **Nearest garage** button (G) routes you to the closest one. Pause → Go to
   garage fast-travels to Festival HQ. New players get a short guided first drive.
   Quick Race, Split Screen and Time Trial are the **Arcade: all cars unlocked, no rewards**.
@@ -164,6 +165,7 @@ src/car.js            car physics
 src/carmodels.js      the ten car models (proportions, lights, aero, liveries)
 src/carkit.js         procedural body toolkit: lofted shells, arch cut-outs, surface panels, wheels
 showroom.html         turntable viewer for every car (drag to orbit, pick colours)
+src/garage3d.js       the 3D garage rooms (dealer showroom, Festival HQ, tuning shop) behind the garage menus
 404.html              branded not-found page (GitHub Pages serves it for missing paths)
 robots.txt, sitemap.xml  crawler hints (see Publishing checklist)
 assets/               favicons, app icons and og-image.png (1200x630 social preview)

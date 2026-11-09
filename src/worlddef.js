@@ -240,7 +240,7 @@ export const CHAMPIONSHIPS = [
 ];
 
 /**
- * Garages on the island. Festival HQ (everything: buy, choose, upgrade, paint) sits just
+ * Garages on the island. Festival HQ (your cars: switch, paint, upgrade) sits just
  * past the festival start; the dealership only sells cars, the tuning shops only upgrade.
  * Like the championship venues, each moves along its road to a quiet stretch with room
  * for the building beside it. `side` (1: left of the road's direction, -1: right) keeps
