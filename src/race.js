@@ -6,7 +6,7 @@ import { driveAI } from './ai.js';
 import { collideCars, crashShake } from './crash.js';
 import { HUD } from './hud.js';
 import { DriftFx } from './fx.js';
-import { buildSun, aimSun, buildEnvironment, disposeEnvironment, updateChaseCamera, snapChaseCamera } from './scenekit.js';
+import { buildSun, aimSun, buildEnvironment, disposeEnvironment, disposeScene, updateChaseCamera, snapChaseCamera } from './scenekit.js';
 import { buildSky, buildBackdrop } from './sky.js';
 
 const clamp = THREE.MathUtils.clamp;
@@ -451,10 +451,7 @@ export class Race {
     this.fx.dispose();
     disposeEnvironment(this.envTex);
     this.input.setTouchVisible(false);
-    this.scene.traverse(o => {
-      if (o.geometry) o.geometry.dispose();
-      if (o.material) { const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) { if (m.map) m.map.dispose(); m.dispose(); } }
-    });
+    disposeScene(this.scene);
   }
 }
 

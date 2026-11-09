@@ -6,7 +6,7 @@ import { World, fbm, smoothstep, mulberry32, coastDist } from './world.js';
 import { Car } from './car.js';
 import { disposeCarMesh } from './carmodels.js';
 import { DriftFx } from './fx.js';
-import { buildSun, aimSun, buildEnvironment, disposeEnvironment, updateChaseCamera, snapChaseCamera } from './scenekit.js';
+import { buildSun, aimSun, buildEnvironment, disposeEnvironment, disposeScene, updateChaseCamera, snapChaseCamera } from './scenekit.js';
 import { buildSky } from './sky.js';
 import { addBandAttributes, bandMaterial } from './bands.js';
 import { vegetationMesh } from './nature.js';
@@ -968,7 +968,7 @@ export class Horizon {
     this.fx.dispose();
     this.input.setTouchVisible(false);
     disposeEnvironment(this.envTex);
-    disposeGroup(this.scene, true);
+    disposeScene(this.scene);   // everything, lights' shadow maps and every texture slot included
   }
 }
 
@@ -1046,7 +1046,7 @@ function disposeGroup(root, all = false) {
       const ms = Array.isArray(o.material) ? o.material : [o.material];
       for (const m of ms) {
         if (!all && m.userData.shared) continue;
-        if (m.map && (all || !m.map.userData.shared)) m.map.dispose();
+        for (const k of Object.keys(m)) if (m[k] && m[k].isTexture && (all || !m[k].userData.shared)) m[k].dispose();
         m.dispose();
       }
     }

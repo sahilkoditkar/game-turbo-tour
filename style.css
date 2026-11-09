@@ -373,6 +373,16 @@ body.in-garage #hud-layer { display: none; }
   .gx-hint { display: none; }
 }
 .gx-paint .swatch:not(.active) { box-shadow: inset 0 0 0 1px rgba(255,255,255,.28); }
+/* short desktop screens (720p laptops): tighten the side panel so Festival HQ fits without scrolling */
+@media (max-height: 820px) and (min-width: 901px) {
+  .gx-side { padding: 14px 16px; }
+  .gx-desc { margin: 4px 0 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .gx-side h3 { margin: 8px 0 5px; }
+  .gx-up { padding: 5px 10px; } .gx-up .meta { display: none; }
+  .gx-paint .swatch { width: 24px; height: 24px; }
+  .gx-else { display: none; }   /* where-else-to-go: the map says it too */
+  .gx-side .stat-bar { margin: 3px 0 5px; } .gx-side .stat-row { font-size: 11px; }
+}
 .gx-cost { float: right; letter-spacing: .05em; text-transform: none; color: var(--muted); font-weight: 400; }
 .gx-respray { display: flex; gap: 8px; margin-top: 12px; }
 .gx-respray .primary { flex: 1; }

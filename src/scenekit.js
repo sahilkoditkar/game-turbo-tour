@@ -62,6 +62,24 @@ export function buildEnvironment(renderer, th) {
   return rt.texture;
 }
 
+/**
+ * Free everything a scene holds on the GPU when a race or the open world closes: geometry,
+ * every texture a material uses (map, emissiveMap, ...), the materials, and the lights'
+ * shadow maps. Shared car-model geometry freed here is simply uploaded again when next used.
+ */
+export function disposeScene(root) {
+  root.traverse((o) => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.isLight && o.dispose) o.dispose();
+    if (!o.material) return;
+    for (const m of [].concat(o.material)) {
+      for (const k of Object.keys(m)) if (m[k] && m[k].isTexture) m[k].dispose();
+      if (m.uniforms) for (const u of Object.values(m.uniforms)) if (u && u.value && u.value.isTexture) u.value.dispose();
+      m.dispose();
+    }
+  });
+}
+
 /** Free an environment map from buildEnvironment (its render target, not just the texture). */
 export function disposeEnvironment(tex) {
   if (!tex) return;
