@@ -6,7 +6,7 @@ import { World, fbm, smoothstep, mulberry32, coastDist } from './world.js';
 import { Car } from './car.js';
 import { disposeCarMesh } from './carmodels.js';
 import { DriftFx } from './fx.js';
-import { buildSun, aimSun, buildEnvironment, disposeEnvironment, disposeScene, updateChaseCamera, snapChaseCamera } from './scenekit.js';
+import { buildSun, aimSun, buildEnvironment, disposeEnvironment, disposeScene, releaseShadowTextures, updateChaseCamera, snapChaseCamera } from './scenekit.js';
 import { buildSky } from './sky.js';
 import { addBandAttributes, bandMaterial } from './bands.js';
 import { vegetationMesh } from './nature.js';
@@ -395,9 +395,23 @@ export class Horizon {
   // ------------------------------------------------------------ Chunk streaming
   _chunkKey(cx, cz) { return `${cx},${cz}`; }
 
-  /** Build missing chunks near the player (all of them when `all`, else a couple per frame) and drop far ones. */
-  _streamChunks(all = false) {
+  /** Build missing chunks near the player (all of them when `all`, else a couple per frame) and drop far ones; `dt` is the frame's game time. */
+  _streamChunks(all = false, dt = 0) {
     const px = this.car.pos.x, pz = this.car.pos.z;
+    // Drop far chunks once a second of game time, whatever the frame rate (a slow device must
+    // not skip it, or it keeps ever more chunks and slows down further), and straight away
+    // after a jump (`all`: fast travel, resume), before the new area is built.
+    this.evictTimer = (this.evictTimer ?? 1) - dt;
+    if (all || this.evictTimer <= 0) {
+      this.evictTimer = 1;
+      for (const [key, c] of this.chunks) {
+        if (Math.hypot(c.x - px, c.z - pz) > VIEW_R + 320) {
+          this.scene.remove(c.group);
+          disposeGroup(c.group);
+          this.chunks.delete(key);
+        }
+      }
+    }
     const ccx = Math.floor(px / CHUNK), ccz = Math.floor(pz / CHUNK);
     const R = Math.ceil(VIEW_R / CHUNK);
     const want = [];
@@ -417,15 +431,6 @@ export class Horizon {
       const c = this._buildChunk(w.cx, w.cz);
       this.chunks.set(w.key, c);
       this.scene.add(c.group);
-    }
-    if (!all && (this.time % 1) < 0.02) {
-      for (const [key, c] of this.chunks) {
-        if (Math.hypot(c.x - px, c.z - pz) > VIEW_R + 320) {
-          this.scene.remove(c.group);
-          disposeGroup(c.group);
-          this.chunks.delete(key);
-        }
-      }
     }
   }
 
@@ -649,7 +654,7 @@ export class Horizon {
     if (this.engine) this.audio.updateEngine(this.engine, clamp(car.speed / car.stats.maxSpeed, 0, 1), car.input.throttle, car.drifting || (car.input.handbrake && car.speed > 5), 1);
     for (const ring of this.eventRings) ring.material.opacity = 0.45 + 0.3 * Math.sin(this.time * 3);
 
-    this._streamChunks(false);
+    this._streamChunks(false, dt);
     this._cullProps();
     this.hud.update(dt);
 
@@ -969,6 +974,13 @@ export class Horizon {
     this.input.setTouchVisible(false);
     disposeEnvironment(this.envTex);
     disposeScene(this.scene);   // everything, lights' shadow maps and every texture slot included
+    // materials shared between chunks are only reachable through loaded chunks: free them
+    // directly in case none of the chunks that use them is loaded now
+    this.propKit.dispose();
+    for (const m of [...(this.facadeMats || []), ...(this.warehouseMats || []), ...(this.shopMats || []), this.roofMat]) {
+      if (m) { m.map?.dispose(); m.dispose(); }
+    }
+    releaseShadowTextures(this.renderer);
   }
 }
 

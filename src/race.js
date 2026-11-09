@@ -6,7 +6,7 @@ import { driveAI } from './ai.js';
 import { collideCars, crashShake } from './crash.js';
 import { HUD } from './hud.js';
 import { DriftFx } from './fx.js';
-import { buildSun, aimSun, buildEnvironment, disposeEnvironment, disposeScene, updateChaseCamera, snapChaseCamera } from './scenekit.js';
+import { buildSun, aimSun, buildEnvironment, disposeEnvironment, disposeScene, releaseShadowTextures, updateChaseCamera, snapChaseCamera } from './scenekit.js';
 import { buildSky, buildBackdrop } from './sky.js';
 
 const clamp = THREE.MathUtils.clamp;
@@ -452,6 +452,7 @@ export class Race {
     disposeEnvironment(this.envTex);
     this.input.setTouchVisible(false);
     disposeScene(this.scene);
+    releaseShadowTextures(this.renderer);
   }
 }
 
