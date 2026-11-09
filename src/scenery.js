@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { addVegetation } from './nature.js';
 import { mergeByMaterial } from './carkit.js';
+import { addBandAttributes, bandMaterial, bandColors, loopCycle } from './bands.js';
 
 // Deterministic pseudo-random so the scenery is the same every time.
 function mulberry32(a) {
@@ -21,12 +22,10 @@ export function buildScenery(track, quality = 'high') {
   const cx = (b.minX + b.maxX) / 2, cz = (b.minZ + b.maxZ) / 2;
   const extent = Math.max(b.maxX - b.minX, b.maxZ - b.minZ);
 
-  // Terrain: a height-mapped ground that hugs the road and rolls away from it
-  const groundTex = makeGroundTexture(th);
-  groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping;
+  // Terrain: a height-mapped ground that hugs the road and rolls away from it, in flat
+  // colour with light and dark bands across the track near the road (see bands.js)
   const terrainSize = extent + 1100;
   const cellsN = Math.min(highQ ? 420 : 300, Math.round(terrainSize / (highQ ? 9 : 14)));
-  groundTex.repeat.set(terrainSize / 40, terrainSize / 40);
   const terrainGeo = new THREE.PlaneGeometry(terrainSize, terrainSize, cellsN, cellsN);
   terrainGeo.rotateX(-Math.PI / 2);
   const tp = terrainGeo.attributes.position;
@@ -35,7 +34,9 @@ export function buildScenery(track, quality = 'high') {
     tp.setY(i, track.terrainHeight(x, z));
   }
   terrainGeo.computeVertexNormals();
-  const terrain = new THREE.Mesh(terrainGeo, new THREE.MeshStandardMaterial({ map: groundTex, roughness: 1, metalness: 0 }));
+  const cycle = track.open ? 48 : loopCycle(track.length);
+  addBandAttributes(terrainGeo, (x, z) => { const n = track.nearestGlobal(x, z); return { s: n.idx * track.spacing, dist: n.dist, cycle }; }, cx, cz);
+  const terrain = new THREE.Mesh(terrainGeo, bandMaterial(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 }), { colors: bandColors(th.ground) }));
   terrain.position.set(cx, 0, cz);
   terrain.receiveShadow = true;
   g.add(terrain);
@@ -277,23 +278,6 @@ function buildGrandstand(th, rand) {
     post.position.set(x, 5, 12); g.add(post);
   }
   return g;
-}
-
-function makeGroundTexture(th) {
-  const c = document.createElement('canvas');
-  c.width = 128; c.height = 128;
-  const ctx = c.getContext('2d');
-  const a = new THREE.Color(th.ground), b = new THREE.Color(th.groundAlt);
-  for (let y = 0; y < 128; y += 4) for (let x = 0; x < 128; x += 4) {
-    const t = Math.random();
-    const col = a.clone().lerp(b, t);
-    ctx.fillStyle = `rgb(${col.r * 255 | 0},${col.g * 255 | 0},${col.b * 255 | 0})`;
-    ctx.fillRect(x, y, 4, 4);
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.magFilter = THREE.LinearFilter;
-  return tex;
 }
 
 /** Lit windows on a dark facade; palette 'warm', 'cool' or 'mixed'. */
