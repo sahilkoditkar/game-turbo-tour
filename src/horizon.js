@@ -6,7 +6,7 @@ import { World, fbm, smoothstep, mulberry32, coastDist } from './world.js';
 import { Car } from './car.js';
 import { disposeCarMesh } from './carmodels.js';
 import { DriftFx } from './fx.js';
-import { buildSun, aimSun, buildEnvironment, updateChaseCamera, snapChaseCamera } from './scenekit.js';
+import { buildSun, aimSun, buildEnvironment, disposeMaterial, releaseShadowTextures, updateChaseCamera, snapChaseCamera } from './scenekit.js';
 import { buildSky } from './sky.js';
 import { addBandAttributes, bandMaterial } from './bands.js';
 import { addTrees, addVegetation } from './nature.js';
@@ -45,14 +45,15 @@ export class Horizon {
     this.scene.fog = new THREE.Fog(th.fog, 300, 1900);
     buildSky(this.scene, th);
     this.sun = buildSun(this.scene, th, this.highQ, 100);
-    this.envTex = buildEnvironment(this.renderer, th);
-    this.scene.environment = this.envTex;
+    this.envRT = buildEnvironment(this.renderer, th);
+    this.scene.environment = this.envRT.texture;
     this.scene.environmentIntensity = 0.9;
 
     this.tmp = new THREE.Vector3(); this.tmp2 = new THREE.Vector3();
     this.chunks = new Map();
     this.boardMeshes = new Map();
     this.time = 0;
+    this.evictTimer = 1;   // seconds until far chunks are next dropped
     this.paused = false; this.suspended = false;
     this.waypoint = null;
     this.route = null; this.routeIdx = null; this.routeTimer = 0;
@@ -371,10 +372,24 @@ export class Horizon {
   // ------------------------------------------------------------ Chunk streaming
   _chunkKey(cx, cz) { return `${cx},${cz}`; }
 
-  /** Build missing chunks near the player (all of them when `all`, else a couple per frame) and drop far ones. */
-  _streamChunks(all = false) {
+  /** Build missing chunks near the player (all of them when `all`, else a couple per frame) and drop far ones; `dt` is the frame's game time. */
+  _streamChunks(all = false, dt = 0) {
     const px = this.car.pos.x, pz = this.car.pos.z;
     const ccx = Math.floor(px / CHUNK), ccz = Math.floor(pz / CHUNK);
+    // Drop far chunks once a second of game time, whatever the frame rate (a slow device must
+    // not skip it, or it keeps ever more chunks and slows down further), and straight away
+    // after a jump (`all`: fast travel, resume), before the new area is built.
+    this.evictTimer -= dt;
+    if (all || this.evictTimer <= 0) {
+      this.evictTimer = 1;
+      for (const [key, c] of this.chunks) {
+        if (Math.hypot(c.x - px, c.z - pz) > VIEW_R + 320) {
+          this.scene.remove(c.group);
+          disposeGroup(c.group);
+          this.chunks.delete(key);
+        }
+      }
+    }
     const R = Math.ceil(VIEW_R / CHUNK);
     const want = [];
     for (let dx = -R; dx <= R; dx++) for (let dz = -R; dz <= R; dz++) {
@@ -393,15 +408,6 @@ export class Horizon {
       const c = this._buildChunk(w.cx, w.cz);
       this.chunks.set(w.key, c);
       this.scene.add(c.group);
-    }
-    if (!all && (this.time % 1) < 0.02) {
-      for (const [key, c] of this.chunks) {
-        if (Math.hypot(c.x - px, c.z - pz) > VIEW_R + 320) {
-          this.scene.remove(c.group);
-          disposeGroup(c.group);
-          this.chunks.delete(key);
-        }
-      }
     }
   }
 
@@ -624,7 +630,7 @@ export class Horizon {
     if (this.engine) this.audio.updateEngine(this.engine, clamp(car.speed / car.stats.maxSpeed, 0, 1), car.input.throttle, car.drifting || (car.input.handbrake && car.speed > 5), 1);
     for (const ring of this.eventRings) ring.material.opacity = 0.45 + 0.3 * Math.sin(this.time * 3);
 
-    this._streamChunks(false);
+    this._streamChunks(false, dt);
     this.hud.update(dt);
 
     this.saveTimer += dt;
@@ -941,8 +947,17 @@ export class Horizon {
     this.hud.dispose();
     this.fx.dispose();
     this.input.setTouchVisible(false);
-    if (this.envTex) this.envTex.dispose();
+    if (this.envRT) this.envRT.dispose();
+    // the sun's shadow map is a render target of its own: free it with the light
+    this.scene.traverse(o => { if (o.isLight) o.dispose(); });
+    // materials shared between chunks are only reachable through loaded chunks; free them
+    // directly in case none of the chunks that use them is loaded now
+    this.propKit.dispose();
+    for (const m of [...(this.facadeMats || []), ...(this.warehouseMats || []), ...(this.shopMats || []), this.roofMat]) {
+      if (m) disposeMaterial(m);
+    }
     disposeGroup(this.scene, true);
+    releaseShadowTextures(this.renderer);
   }
 }
 
@@ -981,8 +996,7 @@ function disposeGroup(root, all = false) {
       const ms = Array.isArray(o.material) ? o.material : [o.material];
       for (const m of ms) {
         if (!all && m.userData.shared) continue;
-        if (m.map && (all || !m.map.userData.shared)) m.map.dispose();
-        m.dispose();
+        disposeMaterial(m, !all);
       }
     }
   });

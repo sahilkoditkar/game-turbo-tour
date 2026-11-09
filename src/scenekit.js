@@ -41,7 +41,50 @@ export function aimSun(sun, focus) {
   sun.target.position.copy(focus);
 }
 
-/** Cheap procedural environment map so paint and glass have reflections. */
+/**
+ * Free a material and every texture it holds (map, emissiveMap, alphaMap, ... and shader
+ * uniforms), not just `map`. With `keepShared`, textures marked `userData.shared` are kept.
+ */
+export function disposeMaterial(m, keepShared = false) {
+  const free = (v) => { if (v && v.isTexture && !(keepShared && v.userData.shared)) v.dispose(); };
+  for (const v of Object.values(m)) free(v);
+  if (m.uniforms) for (const u of Object.values(m.uniforms)) free(u && u.value);
+  m.dispose();
+}
+
+let FLUSH = null;
+/**
+ * three.js (r170) shares one depth material between all shadow casters and keeps the last
+ * textured caster's texture in its uniforms: drawing a caster without a texture does not
+ * clear it. So a texture freed when a scene is torn down is uploaded again by the next
+ * scene's shadow pass and is never freed. Drawing one tiny caster with a permanent 1×1
+ * texture into a 1×1 target replaces that reference. Call after disposing a scene.
+ */
+export function releaseShadowTextures(renderer) {
+  if (!FLUSH) {
+    const tex = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+    tex.needsUpdate = true;
+    const scene = new THREE.Scene();
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.castShadow = true; light.shadow.mapSize.set(1, 1); light.position.set(0, 1, 0);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tex }));
+    mesh.castShadow = true; mesh.frustumCulled = false;
+    scene.add(light, light.target, mesh);
+    const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+    cam.position.set(0, 0, 5);
+    FLUSH = { scene, cam, rt: new THREE.WebGLRenderTarget(1, 1) };
+  }
+  const prev = renderer.getRenderTarget();
+  renderer.setRenderTarget(FLUSH.rt);
+  renderer.render(FLUSH.scene, FLUSH.cam);
+  renderer.setRenderTarget(prev);
+}
+
+/**
+ * Cheap procedural environment map so paint and glass have reflections. Returns the PMREM
+ * render target: use `.texture`, and free it with `dispose()` on the target (disposing only
+ * the texture leaves the target's framebuffer behind).
+ */
 export function buildEnvironment(renderer, th) {
   const env = new THREE.Scene();
   const skyMat = new THREE.ShaderMaterial({
@@ -55,9 +98,10 @@ export function buildEnvironment(renderer, th) {
   sunDisc.position.set(20, 30, 14);
   env.add(sunDisc);
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const tex = pmrem.fromScene(env, 0.04).texture;
+  const rt = pmrem.fromScene(env, 0.04);
   pmrem.dispose();
-  return tex;
+  env.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+  return rt;
 }
 
 /**

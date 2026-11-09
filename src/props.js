@@ -319,6 +319,14 @@ export class PropKit {
     return o;
   }
 
+  /** Free the kit's shared materials, geometries and advert textures (when leaving Free Roam). */
+  dispose() {
+    for (const v of Object.values(this.m)) for (const m of [].concat(v)) m.dispose();
+    for (const g of Object.values(this.g)) g.dispose();
+    for (const m of this.adTextures.values()) { m.map.dispose(); m.dispose(); }
+    this.adTextures.clear();
+  }
+
   _adMat(text, bg, fg) {
     const key = `${text}|${bg}|${fg}`;
     if (!this.adTextures.has(key)) {
