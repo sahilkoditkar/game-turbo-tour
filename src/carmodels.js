@@ -698,6 +698,7 @@ MODELS.muscle = (k) => {
  * Modelled on the 1961 Jaguar E-Type roadster: 4.45 m long, 1.66 m wide, 2.44 m wheelbase. */
 MODELS.classic = (k) => {
   const M = k.M;
+  k.style = 'arcade';
   const W = { fz: 1.10, rz: -1.34, fr: 0.33, rr: 0.33, fx: 0.64, rx: 0.64, fw: 0.185, rw: 0.185 };
   const body = k.loft([
     [-2.33, 0.56, 0.42, 0.60, 0.70, 2.6],
@@ -741,8 +742,12 @@ MODELS.classic = (k) => {
   sym(s => {
     k.tube([[s * 0.2, 0.35, 2.1], [s * 0.35, 0.34, 2.08], [s * 0.5, 0.34, 1.98]], 0.02, M.chrome, 12);
     k.tube([[s * 0.3, 0.44, -2.3], [s * 0.5, 0.44, -2.24], [s * 0.66, 0.44, -2.08]], 0.02, M.chrome, 12);
-    k.dome(body, 'side', -2.24, 0.64, 0.05, 0.05, 0.03, M.tail);
-    k.dome(body, 'side', -2.19, 0.55, 0.035, 0.035, 0.025, M.amber);
+    // round lamps on each rear wing (dome places on +x; mirror for the left side), with a glow
+    for (const [z, y, r, h, mat] of [[-2.24, 0.64, 0.075, 0.04, M.tail], [-2.18, 0.53, 0.04, 0.028, M.amber]]) {
+      const d = k.dome(body, 'side', z, y, r, r, h, mat);
+      if (s < 0) { const n = new THREE.Vector3(0, 1, 0).applyQuaternion(d.quaternion); n.x = -n.x; d.position.x = -d.position.x; d.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), n); }
+    }
+    k.glow(s * (body.sideX(-2.24, 0.64) - 0.06), 0.64, -2.27, 0.42, 0.34, -1);
     k.cyl(0.028, 0.028, 0.2, s * 0.08, 0.32, -2.28, M.chrome, 'z', 12, true);
   });
   k.mirrorPod(0.0, 1.13, 0.3, 0.14, 0.05, 0.06, M.chrome, false);
@@ -753,6 +758,7 @@ MODELS.classic = (k) => {
  * Modelled on the Toyota GR Yaris Rally1 in gravel trim: 4.23 m long, 1.88 m wide, 2.63 m wheelbase. */
 MODELS.rally = (k) => {
   const M = k.M;
+  k.style = 'arcade';
   const W = { fz: 1.30, rz: -1.33, fr: 0.34, rr: 0.34, fx: 0.80, rx: 0.80, fw: 0.22, rw: 0.22 };
   const body = k.loft([
     [-2.08, 0.82, 0.42, 0.78, 1.02, 5],
@@ -814,10 +820,10 @@ MODELS.rally = (k) => {
   // mud flaps
   sym(s => { k.box(0.24, 0.26, 0.01, s * 0.80, 0.19, 0.86, M.trim); k.box(0.24, 0.26, 0.01, s * 0.80, 0.19, -1.8, M.trim); });
   // rear
-  sym(s => {
-    k.fascia([[0.5, 0.86], [0.8, 0.86], [0.82, 0.96], [0.52, 0.97]], -2.08, -1, M.tail, 0.04);
-    k.side(body, quad([-2.07, 0.86], [-1.95, 0.86], [-2.07, 0.97], [-1.97, 0.97]), M.tail, { off: 0.004 });
-  });
+  // tail lamps: one each side (fascia2 mirrors; side patches mirror themselves), wrapping onto the flanks
+  k.fascia2([[0.5, 0.86], [0.8, 0.86], [0.82, 0.96], [0.52, 0.97]], -2.08, -1, M.tail, 0.04);
+  k.side(body, quad([-2.07, 0.86], [-1.95, 0.86], [-2.07, 0.97], [-1.97, 0.97]), M.tail, { off: 0.004 });
+  sym(s => k.glow(s * 0.66, 0.915, -2.08, 0.62, 0.34, -1));
   k.fascia(roundRect(-0.8, 0.42, 0.8, 0.6, 0.04), -2.08, -1, M.gloss, 0.03);
   k.cyl(0.06, 0.06, 0.2, 0.55, 0.42, -2.12, M.alu, 'z', 14, true);
   k.mirrorPod(0.97, 1.1, 0.8, 0.2, 0.1, 0.13, M.accent);
@@ -828,6 +834,7 @@ MODELS.rally = (k) => {
  * Modelled on the 1985 Audi Sport quattro S1 E2: 4.16 m long, 1.86 m wide, 2.22 m wheelbase. */
 MODELS.groupb = (k) => {
   const M = k.M;
+  k.style = 'arcade';
   const W = { fz: 1.18, rz: -1.04, fr: 0.33, rr: 0.33, fx: 0.775, rx: 0.775, fw: 0.25, rw: 0.25 };
   const body = k.loft([
     [-2.00, 0.84, 0.38, 0.78, 0.97, 8, 0, 0.03],
@@ -877,6 +884,7 @@ MODELS.groupb = (k) => {
   // rear: full-width tail panel, huge rear wing
   k.fascia(roundRect(-0.84, 0.7, 0.84, 0.86, 0.02), -2.0, -1, M.tail, 0.04);
   k.fascia(roundRect(-0.3, 0.72, 0.3, 0.84, 0.02), -2.0, -1, M.gloss, 0.04, [], 0.012);
+  sym(s => k.glow(s * 0.57, 0.78, -2.0, 0.72, 0.34, -1));
   k.fascia(roundRect(-0.84, 0.36, 0.84, 0.5, 0.03), -2.0, -1, M.gloss, 0.03);
   k.cyl(0.06, 0.06, 0.2, -0.5, 0.36, -2.04, M.alu, 'z', 14, true);
   k.foil(0.5, 0.1, 1.82, 0, 1.25, -2.02, 0.16, M.paint);
@@ -893,6 +901,7 @@ MODELS.groupb = (k) => {
  * Modelled on a 2022+ ground-effect F1 car: 5.6 m long, 2.0 m wide, 3.6 m wheelbase, 18" wheels. */
 MODELS.formula = (k) => {
   const M = k.M;
+  k.style = 'arcade';
   const W = { fz: 1.8, rz: -1.8, fr: 0.36, rr: 0.36, fx: 0.80, rx: 0.79, fw: 0.305, rw: 0.405 };
   // survival cell and nose
   const tub = k.loft([
@@ -964,7 +973,9 @@ MODELS.formula = (k) => {
   k.foil(0.2, 0.1, 0.9, 0, 0.4, -2.35, 0.2, M.carbon);
   sym(s => k.prof([[-2.22, 0.62], [-2.7, 0.66], [-2.74, 0.98], [-2.6, 1.02], [-2.26, 1.0], [-2.2, 0.9]], 0.015, s * 0.5, M.paint, 0.003));
   k.prof([[-2.2, 0.3], [-2.45, 0.3], [-2.5, 0.8], [-2.35, 0.82]], 0.02, 0, M.carbon, 0.004);
-  k.box(0.08, 0.06, 0.02, 0, 0.3, -2.42, M.tail);
+  // rain light: a bright bar on the crash structure, with a glow
+  k.box(0.18, 0.08, 0.02, 0, 0.3, -2.43, M.tail);
+  k.glow(0, 0.3, -2.43, 0.5, 0.36, -1);
   // suspension: wishbones and push/pull rods
   sym(s => {
     for (const [z0, zw] of [[1.9, 1.8], [-1.6, -1.8]]) {
