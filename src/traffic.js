@@ -2,12 +2,9 @@
 // their lane, slow for corners, queue behind each other and the player, pick a
 // turn at junctions, and are recycled as the player moves on.
 import * as THREE from 'three';
-import { buildCarMesh, buildCarLite, setBrakeLights } from './carmodels.js';
+import { buildCarLOD, setBrakeLights } from './carmodels.js';
 import { mulberry32 } from './world.js';
 import { specOf, contact, resolve, applyToCar, carBody } from './crash.js';
-
-/** Traffic further than this (metres) is drawn as a one-piece car. */
-const LITE_FROM = 45;
 
 /** Highways and main roads have two lanes each way. */
 const multiLane = (road) => road.kind === 'highway' || road.kind === 'road';
@@ -68,12 +65,8 @@ export class Traffic {
   _makeCar() {
     const shape = SHAPES[Math.floor(this.rand() * SHAPES.length)];
     const color = COLORS[Math.floor(this.rand() * COLORS.length)];
-    // full detail up close; one draw call per car beyond LITE_FROM metres (the renderer picks per frame)
-    const full = buildCarMesh(shape, color, this.hz.quality);
-    const mesh = new THREE.LOD();
-    mesh.addLevel(full, 0);
-    mesh.addLevel(buildCarLite(shape, color), LITE_FROM);
-    mesh.userData = full.userData;
+    // full detail up close; one draw call per car beyond CAR_LITE_FROM metres (the renderer picks per frame)
+    const mesh = buildCarLOD(shape, color, this.hz.quality);
     this.group.add(mesh);
     // traffic carries a driver and a passenger or two
     return { mesh, pos: new THREE.Vector3(), wheels: mesh.userData.wheels, front: mesh.userData.frontWheels, brakeLights: mesh.userData.brakeLights, spin: 0, steer: 0, crash: specOf(shape, 150), knock: null };
