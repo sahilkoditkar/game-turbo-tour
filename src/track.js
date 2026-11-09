@@ -382,7 +382,7 @@ export class Track {
     roadTex.wrapT = THREE.RepeatWrapping;
     roadTex.wrapS = THREE.ClampToEdgeWrapping;
     const road = this._strip(N, HW, NHW, 0.12, (i, side) => [side === 0 ? 0 : 1, (i * SPACING) / 12]);
-    const roadMat = new THREE.MeshStandardMaterial({ map: roadTex, roughness: 0.92, metalness: 0.02, color: 0xffffff });
+    const roadMat = new THREE.MeshStandardMaterial({ map: roadTex, roughness: 0.85, metalness: 0.02, color: 0xffffff });
     const roadMesh = new THREE.Mesh(road, roadMat);
     roadMesh.receiveShadow = true;
     this.group.add(roadMesh);
@@ -559,7 +559,7 @@ function lerpColor(a, b, t) {
 }
 
 /**
- * Asphalt with bold markings: solid white edge lines and dashed white lane dividers
+ * Clean, even asphalt with bold markings: solid white edge lines and dashed white lane dividers
  * (4.5 m dash, 7.5 m gap over the 12 m repeat). With an even number of lanes the
  * centre divider is a solid yellow line instead.
  */
@@ -568,19 +568,19 @@ function makeRoadTexture(theme, lanes = 3) {
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   const ctx = c.getContext('2d');
-  const base = new THREE.Color(theme.road);
+  const base = new THREE.Color(theme.road).offsetHSL(0, 0.02, 0.02);
   ctx.fillStyle = `rgb(${base.r * 255 | 0},${base.g * 255 | 0},${base.b * 255 | 0})`;
   ctx.fillRect(0, 0, W, H);
-  // asphalt noise
+  // just a trace of grain so the surface doesn't look like plastic
   const img = ctx.getImageData(0, 0, W, H);
   for (let i = 0; i < img.data.length; i += 4) {
-    const n = (Math.random() - 0.5) * 22;
+    const n = (Math.random() - 0.5) * 5;
     img.data[i] += n; img.data[i + 1] += n; img.data[i + 2] += n;
   }
   ctx.putImageData(img, 0, 0);
   // edge lines
   const line = 9;
-  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.fillStyle = '#ffffff';
   ctx.fillRect(10, 0, line, H);
   ctx.fillRect(W - 10 - line, 0, line, H);
   // lane dividers
@@ -588,7 +588,7 @@ function makeRoadTexture(theme, lanes = 3) {
   for (let k = 1; k < lanes; k++) {
     const x = Math.round(10 + line + (W - 2 * (10 + line)) * (k / lanes)) - line / 2;
     if (lanes % 2 === 0 && k === lanes / 2) { ctx.fillStyle = 'rgba(255,205,40,0.95)'; ctx.fillRect(x, 0, line, H); continue; }
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(x, 0, line, dash);
   }
   const tex = new THREE.CanvasTexture(c);

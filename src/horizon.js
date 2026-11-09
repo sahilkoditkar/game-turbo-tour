@@ -7,6 +7,7 @@ import { Car } from './car.js';
 import { DriftFx } from './fx.js';
 import { buildSun, aimSun, buildEnvironment, updateChaseCamera, snapChaseCamera } from './scenekit.js';
 import { buildSky } from './sky.js';
+import { addBandAttributes, bandMaterial } from './bands.js';
 import { addTrees, addVegetation } from './nature.js';
 import { HorizonHUD } from './horizonhud.js';
 import { Traffic } from './traffic.js';
@@ -282,11 +283,8 @@ export class Horizon {
     sea.position.set(0, SEA_LEVEL, 0);
     this.scene.add(sea);
 
-    // Shared terrain material with a subtle noise detail map
-    const detail = makeDetailTexture();
-    detail.wrapS = detail.wrapT = THREE.RepeatWrapping;
-    detail.repeat.set(CHUNK / 24, CHUNK / 24);
-    this.terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: detail, roughness: 1 });
+    // Shared terrain material: flat region colours, with light bands across each road near it
+    this.terrainMat = bandMaterial(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), { near: 45, far: 75, lift: 0.13 });
   }
 
   // ------------------------------------------------------------ Props (markers, gantries, boards)
@@ -430,6 +428,10 @@ export class Horizon {
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+    addBandAttributes(geo, (x, z) => {
+      const nr = W.nearestGlobal(x, z, 1);
+      return nr.idx < 0 ? { s: 0, dist: 1e4 } : { s: W.samples[nr.idx].li * 2, dist: nr.dist };
+    }, x0, z0);
     const mesh = new THREE.Mesh(geo, this.terrainMat);
     mesh.position.set(x0, 0, z0);
     mesh.receiveShadow = true;
@@ -1009,18 +1011,6 @@ function groundColor(W, x, z, h, out) {
   out.multiplyScalar(0.92 + n * 0.16);
 }
 
-function makeDetailTexture() {
-  const c = document.createElement('canvas'); c.width = c.height = 128;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = '#bdbdbd'; ctx.fillRect(0, 0, 128, 128);
-  const img = ctx.getImageData(0, 0, 128, 128);
-  for (let i = 0; i < img.data.length; i += 4) { const v = 150 + Math.random() * 105; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; }
-  ctx.putImageData(img, 0, 0);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
 function makeWorldRoadTexture(kind, width) {
   const c = document.createElement('canvas');
   c.width = 256; c.height = 256;
@@ -1029,7 +1019,7 @@ function makeWorldRoadTexture(kind, width) {
   ctx.fillStyle = `rgb(${base.r * 255 | 0},${base.g * 255 | 0},${base.b * 255 | 0})`;
   ctx.fillRect(0, 0, 256, 256);
   const img = ctx.getImageData(0, 0, 256, 256);
-  for (let i = 0; i < img.data.length; i += 4) { const n = (Math.random() - 0.5) * (kind === 'dirt' ? 40 : 26); img.data[i] += n; img.data[i + 1] += n; img.data[i + 2] += n; }
+  for (let i = 0; i < img.data.length; i += 4) { const n = (Math.random() - 0.5) * (kind === 'dirt' ? 40 : 6); img.data[i] += n; img.data[i + 1] += n; img.data[i + 2] += n; }
   ctx.putImageData(img, 0, 0);
   if (kind !== 'dirt' && kind !== 'pad') {
     // bold markings: solid edge lines; highways and main roads have four lanes (solid yellow
