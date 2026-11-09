@@ -1078,21 +1078,31 @@ function liteGeometry(shape) {
     const col = new THREE.Color(mat.color || 0xffffff);
     if (mat.emissive && mat.emissiveIntensity > 0.5) col.copy(mat.emissive).multiplyScalar(Math.min(1.4, mat.emissiveIntensity * 0.6));   // lamps read bright
     if (role === 'plate') col.set(0xeeeeee);
-    parts.push({ g, m: new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld), col, roleId: { paint: 1, accent: 2, accent2: 3 }[role] || 0 });
+    // folded parts (surface.js) carry their colour and glow per vertex
+    const surf = mat.userData.surface ? { C: g.attributes.color, E: g.attributes.aEmis } : null;
+    parts.push({ g, m: new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld), col, surf, roleId: { paint: 1, accent: 2, accent2: 3 }[role] || 0 });
   });
   let nv = 0, ni = 0;
   for (const { g } of parts) { nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
   const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), colA = new Float32Array(nv * 3), roleA = new Float32Array(nv), idx = new Uint32Array(ni);
   const v = new THREE.Vector3(), nm = new THREE.Matrix3();
   let vo = 0, io = 0;
-  for (const { g, m, col, roleId } of parts) {
+  const vc = new THREE.Color();
+  for (const { g, m, col, surf, roleId } of parts) {
     if (!g.attributes.normal) g.computeVertexNormals();
     nm.getNormalMatrix(m);
     const P = g.attributes.position, N = g.attributes.normal, flip = m.determinant() < 0;
     for (let i = 0; i < P.count; i++) {
       v.fromBufferAttribute(P, i).applyMatrix4(m); pos.set([v.x, v.y, v.z], (vo + i) * 3);
       v.fromBufferAttribute(N, i).applyMatrix3(nm).normalize(); nor.set([v.x, v.y, v.z], (vo + i) * 3);
-      colA.set([col.r, col.g, col.b], (vo + i) * 3); roleA[vo + i] = roleId;
+      if (surf) {
+        // the same rule as for a whole material: a lamp (bright glow) reads as its glow colour
+        const er = surf.E.getX(i), eg = surf.E.getY(i), eb = surf.E.getZ(i), ei = Math.max(er, eg, eb);
+        if (ei > 0.5) vc.setRGB(er, eg, eb).multiplyScalar(Math.min(1.4, ei * 0.6) / ei);
+        else vc.setRGB(surf.C.getX(i), surf.C.getY(i), surf.C.getZ(i));
+        colA.set([vc.r, vc.g, vc.b], (vo + i) * 3);
+      } else colA.set([col.r, col.g, col.b], (vo + i) * 3);
+      roleA[vo + i] = roleId;
     }
     const I = g.index, cnt = I ? I.count : P.count;
     for (let t = 0; t < cnt; t += 3) {
@@ -1162,8 +1172,20 @@ export function setBrakeLights(list, on) {
   }
 }
 
-/** Build a car mesh. quality: 'high' | 'low'. userData: { wheels, frontWheels, body, brakeLights }. */
-export function buildCarMesh(shape, color, quality = 'high') {
+let SHADOW_ONLY = null;
+/** Draws nothing on screen: the material of a car's shadow stand-in (see buildCarMesh). */
+function shadowOnlyMaterial() {
+  if (!SHADOW_ONLY) SHADOW_ONLY = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+  return SHADOW_ONLY;
+}
+
+/**
+ * Build a car mesh. quality: 'high' | 'low'. userData: { wheels, frontWheels, body, brakeLights }.
+ * With `shadowProxy` the car's ~35 parts stop casting shadows and one stand-in made from the
+ * one-piece car (liteGeometry) casts them instead: one shadow draw call instead of ~35. The
+ * stand-in rides on the body, so its shadow rolls and pitches with it; it draws nothing on screen.
+ */
+export function buildCarMesh(shape, color, quality = 'high', { shadowProxy = false } = {}) {
   const g = template(shape, quality).clone(true);
   const mats = instanceMaterials(color, g.userData.style);
   const wheels = [], frontWheels = [], brakeLights = [];
@@ -1179,8 +1201,37 @@ export function buildCarMesh(shape, color, quality = 'high') {
       if (r === 'tail' || r === 'glow') brakeLights.push(o);
     }
   });
+  if (shadowProxy && body) {
+    let casts = false;
+    g.traverse((o) => { if (o.isMesh && o.castShadow) { casts = true; o.castShadow = false; } });
+    if (casts) {
+      const proxy = new THREE.Mesh(liteGeometry(shape), shadowOnlyMaterial());
+      proxy.position.y = -body.position.y;   // the one-piece geometry is in the car's root space
+      proxy.castShadow = true;
+      body.add(proxy);
+    }
+  }
   g.userData = { wheels, frontWheels, body, brakeLights };
   return g;
+}
+
+/** Beyond this distance (metres) a car from buildCarLOD is drawn as its one-piece version. */
+export const CAR_LITE_FROM = 45;
+
+/**
+ * A car that switches (THREE.LOD, chosen per camera each frame) between full detail up close,
+ * with a one-draw shadow stand-in, and the one-draw buildCarLite beyond CAR_LITE_FROM metres.
+ * `liteShadow`: whether the far version casts a shadow too. userData is the full car's.
+ */
+export function buildCarLOD(shape, color, quality = 'high', { liteShadow = false } = {}) {
+  const full = buildCarMesh(shape, color, quality, { shadowProxy: true });
+  const lite = buildCarLite(shape, color);
+  lite.castShadow = liteShadow;
+  const lod = new THREE.LOD();
+  lod.addLevel(full, 0);
+  lod.addLevel(lite, CAR_LITE_FROM);
+  lod.userData = full.userData;
+  return lod;
 }
 
 export const MODEL_IDS = Object.keys(MODELS);

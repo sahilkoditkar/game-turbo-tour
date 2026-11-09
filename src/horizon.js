@@ -13,6 +13,7 @@ import { vegetationMesh } from './nature.js';
 import { HorizonHUD } from './horizonhud.js';
 import { Traffic } from './traffic.js';
 import { PropKit, mergeByMaterial } from './props.js';
+import { Batcher } from './batcher.js';
 import { getCar, getSeries, PLAYER_COLORS } from './data.js';
 import { getTrack } from './tracks.js';
 import { playerStats, seriesState, seriesLock, paintOf } from './career.js';
@@ -42,6 +43,7 @@ export class Horizon {
 
     this.world = new World();
     this.scene = new THREE.Scene();
+    this.batcher = new Batcher(this.scene);   // chunk meshes, one draw call per shared material
     const th = this.world.theme;
     this.scene.fog = new THREE.Fog(th.fog, 300, 1900);
     buildSky(this.scene, th);
@@ -225,6 +227,8 @@ export class Horizon {
     // one draw call per material per 1 km tile instead of one per strip (a road was dozens of
     // strips between its junctions and verge gaps); tiles out of view are still culled
     for (const m of mergeByTile(pieces, 1000)) { m.receiveShadow = true; g.add(m); }
+    // and then into the world's batches: one draw call per road material for the whole island
+    this.batcher.absorb(g, () => true);
     this.roadGroup = g;
     this.scene.add(g);
   }
@@ -407,10 +411,13 @@ export class Horizon {
       for (const [key, c] of this.chunks) {
         if (Math.hypot(c.x - px, c.z - pz) > VIEW_R + 320) {
           this.scene.remove(c.group);
+          for (const h of c.batched) this.batcher.remove(h);
           disposeGroup(c.group);
           this.chunks.delete(key);
         }
       }
+      // after a jump the old area's slots rarely fit the new one's pieces: pack the batches
+      if (all) this.batcher.compact();
     }
     const ccx = Math.floor(px / CHUNK), ccz = Math.floor(pz / CHUNK);
     const R = Math.ceil(VIEW_R / CHUNK);
@@ -507,6 +514,11 @@ export class Horizon {
       this.propKit.build(group, props);
       for (const p of props) chunk.buildings.push(...p.colliders);
     }
+    // Terrain, plants, buildings and props share their materials with every other chunk:
+    // move them into the world's batches (one draw call per material for all chunks).
+    // Cars in showroom windows (LOD objects) stay as they are.
+    const underLOD = (o) => { for (let x = o.parent; x && x !== group; x = x.parent) if (x.isLOD) return true; return false; };
+    chunk.batched = this.batcher.absorb(group, (m) => m === this.terrainMat || m.userData.shared, underLOD);
     return chunk;
   }
 
@@ -974,6 +986,7 @@ export class Horizon {
     this.input.setTouchVisible(false);
     disposeEnvironment(this.envTex);
     disposeScene(this.scene);   // everything, lights' shadow maps and every texture slot included
+    this.batcher.dispose();     // and the batches' own matrix textures
     // materials shared between chunks are only reachable through loaded chunks: free them
     // directly in case none of the chunks that use them is loaded now
     this.propKit.dispose();

@@ -126,15 +126,21 @@ export function buildScenery(track, quality = 'high') {
   // Sponsor boards scattered along the outside
   const boardMat = new THREE.MeshStandardMaterial({ map: makeBoardTexture(rand), roughness: 0.7 });
   const boardGeo = new THREE.BoxGeometry(10, 2.2, 0.3);
+  const boards = [], o = new THREE.Object3D();
   for (let i = 0; i < track.count; i += Math.floor(track.count / 14)) {
     const s = track.samples[i];
     const sd = rand() > 0.5 ? 1 : -1;
-    const m = new THREE.Mesh(boardGeo, boardMat);
-    m.position.set(s.p.x + s.n.x * sd * (s.wall + 4), s.p.y + 1.0, s.p.z + s.n.z * sd * (s.wall + 4));
-    m.rotation.y = s.heading;
-    m.castShadow = highQ;
-    g.add(m);
+    o.position.set(s.p.x + s.n.x * sd * (s.wall + 4), s.p.y + 1.0, s.p.z + s.n.z * sd * (s.wall + 4));
+    o.rotation.y = s.heading;
+    o.updateMatrix();
+    boards.push(o.matrix.clone());
   }
+  // every board is the same box and material: one instanced draw call for all of them
+  const bm = new THREE.InstancedMesh(boardGeo, boardMat, boards.length);
+  boards.forEach((m, i) => bm.setMatrixAt(i, m));
+  bm.computeBoundingSphere();
+  bm.castShadow = highQ;
+  g.add(bm);
 
   return g;
 }
@@ -144,24 +150,31 @@ const NEON = [0xff2d95, 0x00e5ff, 0xb46bff, 0xff8a00, 0x39ff88];
 /**
  * Night towers: dark blue-violet blocks with bright windows in three palettes, neon strips
  * round the roof line and up a corner, and neon signs. The strips and signs skip tone
- * mapping so they stay vivid, and are merged into one mesh per colour.
+ * mapping so they stay vivid, and are merged into one mesh per colour. The towers are
+ * merged into one mesh per window palette: each tower's colour is in its vertices and its
+ * window repeat in its texture coordinates, so they share three materials.
  */
 function addBuildings(g, boxes, rand) {
   const winTex = [makeWindowTexture('warm'), makeWindowTexture('cool'), makeWindowTexture('mixed')];
   for (const t of winTex) t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  const towerMats = winTex.map(tex => new THREE.MeshStandardMaterial({ vertexColors: true, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 1.1, roughness: 0.45, metalness: 0.25 }));
+  const towers = winTex.map(() => []);
   const neonMats = NEON.map(c => new THREE.MeshBasicMaterial({ color: c, toneMapped: false }));
   const glowHolder = new THREE.Group();
   const strip = (w, h, d, x, y, z, ci) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), neonMats[ci]); m.position.set(x, y, z); glowHolder.add(m); };
   for (const bx of boxes) {
-    const tex = winTex[Math.floor(rand() * winTex.length)].clone();
-    tex.needsUpdate = true;
-    tex.repeat.set(Math.max(1, Math.round(bx.w / 4)), Math.max(1, Math.round(bx.h / 4)));
+    const k = Math.floor(rand() * winTex.length);
+    const ru = Math.max(1, Math.round(bx.w / 4)), rv = Math.max(1, Math.round(bx.h / 4));
     const c = new THREE.Color().setHSL(0.64 + bx.hue * 0.1, 0.45, 0.07 + rand() * 0.05);
-    const mat = new THREE.MeshStandardMaterial({ color: c, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 1.1, roughness: 0.45, metalness: 0.25 });
     const y0 = bx.y || 0;
-    const m = new THREE.Mesh(new THREE.BoxGeometry(bx.w, bx.h + 4, bx.d), mat);
-    m.position.set(bx.x, y0 + bx.h / 2 - 2, bx.z);
-    g.add(m);
+    const box = new THREE.BoxGeometry(bx.w, bx.h + 4, bx.d);
+    box.translate(bx.x, y0 + bx.h / 2 - 2, bx.z);
+    const uv = box.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * ru, uv.getY(i) * rv);   // the window repeat, baked in
+    const col = new Float32Array(uv.count * 3);
+    for (let i = 0; i < uv.count; i++) col.set([c.r, c.g, c.b], i * 3);
+    box.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    towers[k].push(box);
     const ci = Math.floor(rand() * NEON.length), top = y0 + bx.h + 2;
     if (rand() < 0.6) {   // neon outline round the roof
       const t = 0.35;
@@ -182,9 +195,30 @@ function addBuildings(g, boxes, rand) {
       else strip(0.3, sh, sw, bx.x + sgn * off, sy, bx.z, (ci + 1) % NEON.length);
     }
   }
+  towers.forEach((list, k) => { if (list.length) g.add(new THREE.Mesh(concatGeometries(list), towerMats[k])); });
   mergeByMaterial(glowHolder);
   glowHolder.traverse(o => { if (o.isMesh) o.castShadow = false; });
   g.add(glowHolder);
+}
+
+/** Concatenate indexed geometries with the same attributes (already in place) into one; frees the parts. */
+function concatGeometries(list) {
+  const names = Object.keys(list[0].attributes);
+  let nv = 0, ni = 0;
+  for (const geo of list) { nv += geo.attributes.position.count; ni += geo.index.count; }
+  const out = new THREE.BufferGeometry(), idx = new Uint32Array(ni);
+  for (const n of names) out.setAttribute(n, new THREE.BufferAttribute(new Float32Array(nv * list[0].attributes[n].itemSize), list[0].attributes[n].itemSize));
+  let vo = 0, io = 0;
+  for (const geo of list) {
+    for (const n of names) out.attributes[n].array.set(geo.attributes[n].array, vo * geo.attributes[n].itemSize);
+    const I = geo.index.array;
+    for (let i = 0; i < I.length; i++) idx[io++] = I[i] + vo;
+    vo += geo.attributes.position.count;
+    geo.dispose();
+  }
+  out.setIndex(new THREE.BufferAttribute(idx, 1));
+  out.computeBoundingSphere();
+  return out;
 }
 
 /** Soft round glow sprite (white core fading out) for lamp halos and light pools. */

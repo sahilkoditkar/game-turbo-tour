@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildCarMesh, setBrakeLights } from './carmodels.js';
+import { buildCarMesh, buildCarLOD, setBrakeLights } from './carmodels.js';
 
 const WHEEL_R = 0.36;
 const WHEELBASE = 2.6;
@@ -76,7 +76,8 @@ export class Car {
     this.rank = 1;
 
     this.wheelSpin = 0;
-    this.mesh = buildCarMesh(this.shape, this.color, o.quality);
+    // the player's camera is always close: full detail; AI cars go one-piece when far away
+    this.mesh = o.isPlayer ? buildCarMesh(this.shape, this.color, o.quality, { shadowProxy: true }) : buildCarLOD(this.shape, this.color, o.quality, { liteShadow: true });
     this.wheels = this.mesh.userData.wheels;
     this.frontWheels = this.mesh.userData.frontWheels;
     this.body = this.mesh.userData.body;

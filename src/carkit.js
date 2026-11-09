@@ -2,6 +2,7 @@
 // panels that hug the body surface (lights, glass, intakes, livery), detailed wheels,
 // and a merge pass that keeps each car to a handful of draw calls.
 import * as THREE from 'three';
+import { foldKey, surfaceMaterial, surfaceArrays, writeSurface, setSurfaceAttributes } from './surface.js';
 
 export const PIVOT = 0.36; // body roll/pitch pivot height (the old WHEEL_R)
 
@@ -347,8 +348,12 @@ export function foilGeometry(chord, thick, span, angle = 0) {
 
 /* ------------------------------------------------------------ merging */
 
-/** Merge every mesh below `parent` into one indexed mesh per material. Meshes flagged userData.keep stay. */
-export function mergeByMaterial(parent) {
+/**
+ * Merge every mesh below `parent` into one indexed mesh per material. Meshes flagged
+ * userData.keep stay. With `fold`, plain-coloured materials are folded together into shared
+ * surface materials (see surface.js): one mesh per fold group instead of one per material.
+ */
+export function mergeByMaterial(parent, { fold = false } = {}) {
   parent.updateMatrixWorld(true);
   const inv = parent.matrixWorld.clone().invert();
   const groups = new Map();
@@ -356,18 +361,23 @@ export function mergeByMaterial(parent) {
   parent.traverse(o => {
     if (!o.isMesh || o.userData.keep) return;
     const m = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
-    if (!groups.has(o.material)) groups.set(o.material, []);
-    groups.get(o.material).push({ g: o.geometry, m, shadow: o.castShadow });
+    const fk = fold ? foldKey(o.material) : null;
+    const key = fk ? 'fold:' + fk : o.material;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ g: o.geometry, m, shadow: o.castShadow, mat: o.material, fk });
     doomed.push(o);
   });
   for (const o of doomed) o.removeFromParent();
   const v = new THREE.Vector3(), nm = new THREE.Matrix3();
-  for (const [mat, list] of groups) {
+  for (const list of groups.values()) {
+    const fk = list[0].fk, physical = !!fk && list[0].mat.type === 'MeshPhysicalMaterial';
+    const mat = fk ? surfaceMaterial(fk, list[0].mat) : list[0].mat;
     let nv = 0, ni = 0;
     for (const { g } of list) { nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
     const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), idx = new Uint32Array(ni);
+    const surf = fk ? surfaceArrays(nv, physical) : null;
     let vo = 0, io = 0, shadow = false;
-    for (const { g, m, shadow: s } of list) {
+    for (const { g, m, shadow: s, mat: partMat } of list) {
       shadow = shadow || s;
       if (!g.attributes.normal) g.computeVertexNormals();
       nm.getNormalMatrix(m);
@@ -382,11 +392,13 @@ export function mergeByMaterial(parent) {
         const a = I ? I.getX(t) : t, b = I ? I.getX(t + 1) : t + 1, c = I ? I.getX(t + 2) : t + 2;
         idx[io++] = a + vo; idx[io++] = (flip ? c : b) + vo; idx[io++] = (flip ? b : c) + vo;
       }
+      if (surf) writeSurface(surf, vo, P.count, partMat);
       vo += P.count;
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    if (surf) setSurfaceAttributes(geo, surf);
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
     geo.computeBoundingSphere();
     const mesh = new THREE.Mesh(geo, mat);
@@ -700,7 +712,7 @@ export class Kit {
       nut.rotateZ(Math.PI / 2);
       add(nut, o.nutMat || M.gunmetal, face - 0.01);
     }
-    mergeByMaterial(inner);
+    mergeByMaterial(inner, { fold: true });
 
     // Caliper rides on the upright, not the spinning wheel
     if (o.caliper !== false) {
@@ -719,7 +731,7 @@ export class Kit {
   }
 
   finish() {
-    mergeByMaterial(this.shell);
+    mergeByMaterial(this.shell, { fold: true });
     this.root.userData.style = this.style;
     return this.root;
   }

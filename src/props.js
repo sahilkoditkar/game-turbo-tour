@@ -2,7 +2,8 @@
 // and materials are shared across chunks (userData.shared keeps them alive when a
 // chunk is dropped); repeated small things are drawn as instanced meshes.
 import * as THREE from 'three';
-import { buildCarMesh } from './carmodels.js';
+import { buildCarLOD } from './carmodels.js';
+import { foldKey, surfaceMaterial, surfaceArrays, writeSurface, setSurfaceAttributes } from './surface.js';
 
 const HOUSE_WALLS = [0xe8dcc4, 0xf2f0ea, 0xe9d49a, 0xb9cfe0, 0xe2a58c, 0xb8c9a3];
 const HOUSE_ROOFS = [0x8b3a2e, 0x5a4a42, 0x3f4f5f, 0x7a2f2f, 0x4d5a3a, 0x6b5b4b];
@@ -40,16 +41,16 @@ export class PropKit {
       dome: g(new THREE.SphereGeometry(0.5, 14, 7, 0, Math.PI * 2, 0, Math.PI / 2)),
       pole: g(new THREE.CylinderGeometry(0.13, 0.17, 9, 6).translate(0, 4.5, 0)),
       bar: g(new THREE.BoxGeometry(2.2, 0.14, 0.14).translate(0, 8.3, 0)),
-      rock: g(new THREE.DodecahedronGeometry(0.5, 0)),
+      rock: g((() => { const d = new THREE.DodecahedronGeometry(0.5, 0); d.setIndex([...Array(d.attributes.position.count).keys()]); return d; })()),   // indexed, for mergeByMaterial
       hay: g(new THREE.CylinderGeometry(0.75, 0.75, 1.5, 12).rotateZ(Math.PI / 2).translate(0, 0.75, 0)),
     };
     this.adTextures = new Map();
   }
 
   /**
-   * Build the props of one chunk into `group`. Every building part is merged into one
-   * mesh per material for the whole chunk (a village would otherwise be thousands of
-   * draw calls); small repeated things are instanced.
+   * Build the props of one chunk into `group`. Every building part, pole, rock and hay bale
+   * is merged into one mesh per material (per fold group, for plain colours) for the whole
+   * chunk: a village would otherwise be thousands of draw calls.
    */
   build(group, props) {
     const inst = { pole: [], rock: [], redRock: [], hay: [] };
@@ -64,22 +65,23 @@ export class PropKit {
       o.rotation.y = p.rot;
       holder.add(o);
     }
+    // small repeated things: merged with the rest (a chunk has only a handful of each)
+    const place = (list, geo, material, scale = null) => {
+      for (const p of list) {
+        const m = new THREE.Mesh(geo, material);
+        m.position.set(p.x, p.y, p.z); m.rotation.y = p.rot;
+        if (scale) m.scale.set(...scale(p));
+        holder.add(m);
+      }
+    };
+    place(inst.pole, this.g.pole, this.m.pole);
+    place(inst.pole, this.g.bar, this.m.pole);
+    place(inst.rock, this.g.rock, this.m.rock, (p) => [p.w, p.h * 2, p.d]);
+    place(inst.redRock, this.g.rock, this.m.redRock, (p) => [p.w, p.h * 2, p.d]);
+    place(inst.hay, this.g.hay, this.m.straw);
     mergeByMaterial(group, holder, this.highQ);
     // real car models in the dealership's windows (not merged: each has its own materials)
     for (const p of props) if (p.kind === 'dealer') this._showroomCars(group, p);
-    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3();
-    const instanced = (list, geo, material, scaleFn = () => sc.set(1, 1, 1), yaw = (p) => p.rot) => {
-      if (!list.length) return;
-      const im = new THREE.InstancedMesh(geo, material, list.length);
-      list.forEach((p, i) => { q.setFromEuler(e.set(0, yaw(p), 0)); m4.compose(v.set(p.x, p.y, p.z), q, scaleFn(p)); im.setMatrixAt(i, m4); });
-      im.receiveShadow = true;
-      group.add(im);
-    };
-    instanced(inst.pole, this.g.pole, this.m.pole);
-    instanced(inst.pole, this.g.bar, this.m.pole);
-    instanced(inst.rock, this.g.rock, this.m.rock, (p) => sc.set(p.w, p.h * 2, p.d));
-    instanced(inst.redRock, this.g.rock, this.m.redRock, (p) => sc.set(p.w, p.h * 2, p.d));
-    instanced(inst.hay, this.g.hay, this.m.straw);
   }
 
   // ------------------------------------------------------------ helpers
@@ -265,9 +267,19 @@ export class PropKit {
   _showroomCars(group, p) {
     const cs = Math.cos(p.rot), sn = Math.sin(p.rot);
     [['v12', 0xd2141e, -11, 0.6], ['mamba', 0x1f4fd1, 0, -0.5], ['pony', 0xffc61a, 11, 0.8]].forEach(([shape, color, lz, yaw]) => {
-      const car = buildCarMesh(shape, color, this.highQ ? 'high' : 'low');
-      // the model's geometry belongs to a shared template: never free it with the chunk
-      car.traverse(m => { if (m.geometry) m.geometry.userData.shared = true; if (m.material) for (const mm of [].concat(m.material)) mm.userData.shared = true; });
+      const car = buildCarLOD(shape, color, this.highQ ? 'high' : 'low');
+      // The model's geometry and most materials belong to the shared template (and the glow
+      // sprite to every car): never free them with the chunk. This car's own paint, lamp and
+      // number-plate materials (those with a role) and its one-piece material are freed with it.
+      car.traverse(m => {
+        if (m.geometry) m.geometry.userData.shared = true;
+        for (const mm of [].concat(m.material || [])) {
+          if (m.userData.lite) continue;
+          const role = mm.userData.role;
+          if (!role) mm.userData.shared = true;
+          if (mm.map && role !== 'plate' && role !== 'num') mm.map.userData.shared = true;
+        }
+      });
       car.position.set(p.x + lz * sn, p.y + 0.42, p.z + lz * cs);
       car.rotation.y = p.rot + Math.PI / 2 + yaw;
       group.add(car);
@@ -350,7 +362,9 @@ export class PropKit {
 
 /**
  * Add every mesh under `holder` to `group` merged into one mesh per material (multi-
- * material meshes are split by their geometry groups). The parts' geometries are
+ * material meshes are split by their geometry groups). Plain-coloured materials are folded
+ * together into shared surface materials (surface.js), so a village's dozens of wall, roof,
+ * door and trim colours cost a few draw calls, not one each. The parts' geometries are
  * copied, so `holder` itself is thrown away.
  */
 export function mergeByMaterial(group, holder, castShadow = false) {
@@ -362,22 +376,28 @@ export function mergeByMaterial(group, holder, castShadow = false) {
     const groups = Array.isArray(m.material) ? m.geometry.groups : [{ start: 0, count: m.geometry.index.count, materialIndex: 0 }];
     for (const g of groups) {
       const mat = mats[g.materialIndex];
-      if (!batches.has(mat)) batches.set(mat, []);
-      batches.get(mat).push({ geo: m.geometry, matrix: m.matrixWorld, start: g.start, count: g.count });
+      const fk = foldKey(mat);
+      const key = fk ? 'fold:' + fk : mat;
+      if (!batches.has(key)) batches.set(key, { fk, like: mat, parts: [] });
+      batches.get(key).parts.push({ geo: m.geometry, matrix: m.matrixWorld, start: g.start, count: g.count, mat });
     }
   });
-  for (const [mat, parts] of batches) {
-    const mesh = new THREE.Mesh(mergeParts(parts), mat);
+  for (const { fk, like, parts } of batches.values()) {
+    const mesh = new THREE.Mesh(mergeParts(parts, fk ? like.type === 'MeshPhysicalMaterial' : null), fk ? surfaceMaterial(fk, like) : like);
     mesh.receiveShadow = true; mesh.castShadow = castShadow;
     group.add(mesh);
   }
 }
 
-/** One indexed geometry from parts { geo, matrix, start, count } (an index range of geo). */
-function mergeParts(parts) {
+/**
+ * One indexed geometry from parts { geo, matrix, start, count, mat } (an index range of geo).
+ * `surface` (null, or whether the fold group is physical) adds the surface attributes.
+ */
+function mergeParts(parts, surface = null) {
   let nv = 0, ni = 0;
   for (const p of parts) { nv += p.geo.attributes.position.count; ni += p.count; }
   const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), uv = new Float32Array(nv * 2), idx = new Uint32Array(ni);
+  const surf = surface === null ? null : surfaceArrays(nv, surface);
   const v = new THREE.Vector3(), nm = new THREE.Matrix3();
   let vo = 0, io = 0;
   for (const p of parts) {
@@ -389,12 +409,14 @@ function mergeParts(parts) {
       if (U) uv.set([U.getX(k), U.getY(k)], (vo + k) * 2);
     }
     for (let k = 0; k < p.count; k++) idx[io + k] = I.getX(p.start + k) + vo;
+    if (surf) writeSurface(surf, vo, P.count, p.mat);
     vo += P.count; io += p.count;
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
   g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  if (surf) setSurfaceAttributes(g, surf);
   g.setIndex(new THREE.BufferAttribute(idx, 1));
   return g;
 }
