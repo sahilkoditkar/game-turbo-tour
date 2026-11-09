@@ -112,8 +112,16 @@ export function effectiveStats(car, levels = {}) {
   };
 }
 
+/** Paint colours: the player colours for split screen and the garage's paint shop (same order as PAINT_NAMES). */
 export const PLAYER_COLORS = [
   0xff5a1f, 0x2f7bff, 0x3ddc84, 0xffd23f, 0xb04cff, 0xff4d9d, 0x00d4ff, 0xffffff,
+  0x111111, 0x1e3a8a, 0xb91c1c, 0x9ca3af,
+];
+/** A respray at Festival HQ (a new car's colour at the dealer is free). */
+export const PAINT_COST = 250;
+export const PAINT_NAMES = [
+  'Festival Orange', 'Electric Blue', 'Mint Green', 'Sunburst Yellow', 'Ultraviolet', 'Hot Pink', 'Cyan Rush', 'Pearl White',
+  'Midnight Black', 'Navy Blue', 'Racing Red', 'Silver',
 ];
 
 export const AI_COLORS = [

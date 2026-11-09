@@ -140,7 +140,7 @@ export class HorizonHUD {
       let html;
       if (e.kind === 'garage') html = e.type === 'dealer' ? `<kbd>Enter</kbd> Browse cars at <b>${e.name}</b> · buy and drive away`
         : e.type === 'tuning' ? `<kbd>Enter</kbd> Upgrade your car at <b>${e.name}</b>`
-        : `<kbd>Enter</kbd> Open the garage at <b>${e.name}</b> · buy, choose, upgrade, paint`;
+        : `<kbd>Enter</kbd> Open the garage at <b>${e.name}</b> · switch car, paint, upgrade`;
       else if (e.kind === 'series') {
         const st = hz.seriesStatus(e.series);
         html = st.locked ? `🔒 <b>${e.name}</b> · ${st.text.replace('Locked: ', '')} <span class="meta">(Enter for details)</span>`

@@ -347,7 +347,8 @@ function roadLabelSpots(world) {
 
 // ------------------------------------------------------------------ Map screen
 const FILTERS = [
-  { id: 'series', label: 'Championships' }, { id: 'event', label: 'Circuits' }, { id: 'stage', label: 'Stages' }, { id: 'trap', label: 'Speed traps' },
+  { id: 'series', label: 'Championships' }, { id: 'garage', label: 'Festival HQ' }, { id: 'dealer', label: 'Dealership' }, { id: 'tuning', label: 'Tuning shops' },
+  { id: 'event', label: 'Circuits' }, { id: 'stage', label: 'Stages' }, { id: 'trap', label: 'Speed traps' },
   { id: 'drift', label: 'Drift zones' }, { id: 'zone', label: 'Speed zones' }, { id: 'board', label: 'Bonus boards' },
 ];
 
@@ -359,7 +360,7 @@ export class WorldMap {
   constructor(host, o) {
     this.hz = o.hz; this.app = o.app; this.world = o.hz.world;
     this.onClose = o.onClose; this.fromPause = !!o.fromPause;
-    this.filters = this.hz.mapFilters || (this.hz.mapFilters = Object.fromEntries(FILTERS.map(f => [f.id, true])));
+    this.filters = this.hz.mapFilters = { ...Object.fromEntries(FILTERS.map(f => [f.id, true])), ...(this.hz.mapFilters || {}) };
     this.selected = this.hz.waypoint || null;
     this.hover = null;
     this.dragging = null;
@@ -580,7 +581,7 @@ export class WorldMap {
     const W = this.world, out = [];
     for (const m of W.markers) {
       const cat = markerCategory(m);
-      if (!['hub', 'garage', 'dealer', 'tuning'].includes(cat) && this.filters[cat] === false) continue;
+      if (cat !== 'hub' && this.filters[cat] === false) continue;
       out.push(m);
     }
     if (this.filters.board) for (const b of W.boards) if (!this.hz.prog.boards.includes(b.id)) out.push(b);
@@ -664,7 +665,7 @@ export class WorldMap {
   _kindName(m) {
     return {
       hub: 'Festival hub', trap: 'Speed trap', drift: 'Drift zone', zone: 'Speed zone', board: 'Bonus board', custom: m.name,
-      series: 'Championship', garage: { hq: 'Garage · buy, choose, upgrade, paint', dealer: 'Dealership · buy cars', tuning: 'Tuning shop · upgrades' }[m.type] || 'Garage',
+      series: 'Championship', garage: { hq: 'Garage · switch car, paint, upgrade', dealer: 'Dealership · buy cars', tuning: 'Tuning shop · upgrades' }[m.type] || 'Garage',
       event: m.track ? (m.track.kind === 'stage' ? 'Point-to-point stage' : 'Circuit race') : 'Event',
     }[m.kind];
   }

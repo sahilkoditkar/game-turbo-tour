@@ -235,12 +235,12 @@ export const EVENTS = [
 export const CHAMPIONSHIPS = [
   { series: 'rookie', road: 'farm2', at: [-1000, 1550] },
   { series: 'pro', road: 'canyon', at: [2700, -760] },
-  { series: 'gp', road: 'coast', at: [-2700, 1250] },
+  { series: 'gp', road: 'timber', at: [-2580, -1050] },   // Timberline Road, deep in Pinewood Hills
   { series: 'legends', road: 'mesa', at: [1500, -2050] },
 ];
 
 /**
- * Garages on the island. Festival HQ (everything: buy, choose, upgrade, paint) sits just
+ * Garages on the island. Festival HQ (your cars: switch, paint, upgrade) sits just
  * past the festival start; the dealership only sells cars, the tuning shops only upgrade.
  * Like the championship venues, each moves along its road to a quiet stretch with room
  * for the building beside it. `side` (1: left of the road's direction, -1: right) keeps

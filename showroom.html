@@ -96,7 +96,7 @@
     const bar = document.getElementById('bar');
     for (const c of CARS) { const b = document.createElement('button'); b.textContent = c.name; b.dataset.id = c.id; b.onclick = () => { carId = c.id; show(); }; bar.appendChild(b); }
     const cols = document.getElementById('colors');
-    for (const c of [...PLAYER_COLORS, 0x111111, 0x1e3a8a, 0xb91c1c, 0x9ca3af]) { const i = document.createElement('i'); i.style.background = '#' + c.toString(16).padStart(6, '0'); i.onclick = () => { color = c; show(); }; cols.appendChild(i); }
+    for (const c of PLAYER_COLORS) { const i = document.createElement('i'); i.style.background = '#' + c.toString(16).padStart(6, '0'); i.onclick = () => { color = c; show(); }; cols.appendChild(i); }
     show();
 
     let drag = null;

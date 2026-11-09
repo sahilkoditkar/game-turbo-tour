@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { World, fbm, smoothstep, mulberry32, coastDist } from './world.js';
 import { Car } from './car.js';
+import { disposeCarMesh } from './carmodels.js';
 import { DriftFx } from './fx.js';
 import { buildSun, aimSun, buildEnvironment, updateChaseCamera, snapChaseCamera } from './scenekit.js';
 import { buildSky } from './sky.js';
@@ -14,7 +15,7 @@ import { Traffic } from './traffic.js';
 import { PropKit, mergeByMaterial } from './props.js';
 import { getCar, getSeries, PLAYER_COLORS } from './data.js';
 import { getTrack } from './tracks.js';
-import { playerStats, seriesState, seriesLock } from './career.js';
+import { playerStats, seriesState, seriesLock, paintOf } from './career.js';
 import { getControl } from './input.js';
 import { WORLD_HALF, SEA_Z, SEA_LEVEL, CITY, CITY_OUTSKIRTS, BOARD_XP, REGIONS, levelForXp } from './worlddef.js';
 import { crashShake } from './crash.js';
@@ -92,7 +93,7 @@ export class Horizon {
   _makeCar() {
     const p = this.profile;
     const carDef = getCar(p.selected);
-    this.car = new Car({ name: p.name, color: PLAYER_COLORS[p.colorIndex || 0], stats: playerStats(p), shape: carDef.shape, isPlayer: true, playerIndex: 0, quality: this.quality });
+    this.car = new Car({ name: p.name, color: PLAYER_COLORS[paintOf(p)], stats: playerStats(p), shape: carDef.shape, isPlayer: true, playerIndex: 0, quality: this.quality });
     this.scene.add(this.car.mesh);
   }
 
@@ -119,7 +120,8 @@ export class Horizon {
   swapCar() {
     const old = this.car;
     const { x, z } = old.pos, heading = old.heading, idx = old.trackIdx, y = old.pos.y;
-    this.scene.remove(old.mesh);   // not disposed: a car's geometry belongs to a template shared with every other car
+    this.scene.remove(old.mesh);
+    disposeCarMesh(old.mesh);      // its own paint and plate textures; the geometry belongs to the shared model template
     this._makeCar();
     this.car.trackIdx = idx;
     this.car.place(x, z, heading, y);
@@ -867,7 +869,7 @@ export class Horizon {
     if (m.kind === 'zone') return P.zones[m.id] ? `${P.zones[m.id]} km/h avg · ${this._starStr(this._stars(P.zones[m.id], m.stars))}` : 'Not set';
     if (m.kind === 'event') return P.events[m.id] ? `Best finish: P${P.events[m.id]}` : 'Not raced yet';
     if (m.kind === 'series') return this.seriesStatus(m.series).text;
-    if (m.kind === 'garage') return { hq: 'Buy cars, choose, upgrade, paint', dealer: 'Buy cars', tuning: 'Upgrade your car' }[m.type];
+    if (m.kind === 'garage') return { hq: 'Your cars: switch, paint, upgrade', dealer: 'Browse and buy cars', tuning: 'Upgrade your car' }[m.type];
     return '';
   }
 
