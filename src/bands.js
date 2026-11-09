@@ -28,7 +28,7 @@ export function loopCycle(L, cycle = 48) { return L / Math.max(1, Math.round(L /
 /**
  * Patch a MeshStandardMaterial to draw the bands.
  * o.colors [light, dark] replaces the surface colour with flat bands (race tracks);
- * otherwise the existing colour (e.g. vertex colours) is lifted by o.lift on light bands.
+ * otherwise the existing colour (e.g. vertex colours) is lifted by o.lift (linear) on light bands, or darkened if pale.
  * Bands fade out between o.near and o.far metres from the road.
  */
 export function bandMaterial(mat, o = {}) {
@@ -42,7 +42,12 @@ export function bandMaterial(mat, o = {}) {
     sh.fragmentShader = 'uniform vec3 uBandA;\nuniform vec3 uBandB;\nvarying float vBand;\nvarying float vBandDist;\n' +
       sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
   float bandOn = step(0.0, vBand) * (1.0 - smoothstep(${near.toFixed(1)}, ${far.toFixed(1)}, vBandDist));
-  ${flat ? 'diffuseColor.rgb = mix(uBandB, uBandA, bandOn);' : `diffuseColor.rgb *= 1.0 + ${(o.lift ?? 0.12).toFixed(3)} * bandOn;`}`);
+  ${flat ? 'diffuseColor.rgb = mix(uBandB, uBandA, bandOn);' : `
+  // the same step as the flat bands, in linear colour: darker ground gets lighter bands,
+  // pale ground (snow, sand, concrete) darker ones
+  float bandLum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+  vec3 bandCol = bandLum > 0.42 ? diffuseColor.rgb * mix(0.68, 0.86, smoothstep(0.5, 0.85, bandLum)) : min(diffuseColor.rgb * ${(1 + (o.lift ?? 0.7)).toFixed(3)} + 0.01, vec3(1.0));
+  diffuseColor.rgb = mix(diffuseColor.rgb, bandCol, bandOn);`}`);
   };
   mat.customProgramCacheKey = () => (flat ? 'bands-flat' : 'bands-lift');
   mat.needsUpdate = true;
