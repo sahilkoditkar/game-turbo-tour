@@ -62,6 +62,34 @@ export function buildEnvironment(renderer, th) {
   return rt.texture;
 }
 
+let FLUSH = null;
+/**
+ * three.js (r170) shares one depth material between all shadow casters and keeps the last
+ * textured caster's texture in its uniforms: drawing a caster without a texture does not
+ * clear it. So a texture freed when a scene is torn down is uploaded again by the next
+ * scene's shadow pass and is never freed. Drawing one tiny caster with a permanent 1×1
+ * texture into a 1×1 target replaces that reference. Call after disposing a scene.
+ */
+export function releaseShadowTextures(renderer) {
+  if (!FLUSH) {
+    const tex = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+    tex.needsUpdate = true;
+    const scene = new THREE.Scene();
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.castShadow = true; light.shadow.mapSize.set(1, 1); light.position.set(0, 1, 0);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tex }));
+    mesh.castShadow = true; mesh.frustumCulled = false;
+    scene.add(light, light.target, mesh);
+    const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+    cam.position.set(0, 0, 5);
+    FLUSH = { scene, cam, rt: new THREE.WebGLRenderTarget(1, 1) };
+  }
+  const prev = renderer.getRenderTarget();
+  renderer.setRenderTarget(FLUSH.rt);
+  renderer.render(FLUSH.scene, FLUSH.cam);
+  renderer.setRenderTarget(prev);
+}
+
 /**
  * Free everything a scene holds on the GPU when a race or the open world closes: geometry,
  * every texture a material uses (map, emissiveMap, ...), the materials, and the lights'

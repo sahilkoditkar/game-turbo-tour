@@ -5,6 +5,7 @@
 // tuning shop a workshop with tyre stacks and a lift.
 import * as THREE from 'three';
 import { buildCarMesh, disposeCarMesh } from './carmodels.js';
+import { releaseShadowTextures } from './scenekit.js';
 
 const THEMES = {
   dealer: {   // night showroom: glossy dark floor, cool white light, the city through the glass
@@ -310,5 +311,6 @@ export class GarageStage {
     this.envRT.dispose();
     this.meshes.clear();
     this.scene.clear();
+    releaseShadowTextures(this.renderer);
   }
 }

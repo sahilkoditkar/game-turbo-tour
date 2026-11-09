@@ -5,6 +5,7 @@ import { UI } from './ui.js';
 import { Race } from './race.js';
 import { Horizon } from './horizon.js';
 import { GarageStage } from './garage3d.js';
+import { disposeCarMesh } from './carmodels.js';
 import { EVENT_PRIZE } from './worlddef.js';
 import { getTrack } from './tracks.js';
 import { getCar, getSeries, PLAYER_COLORS, effectiveStats } from './data.js';
@@ -113,9 +114,13 @@ class App {
 
   _refreshIdleCars() {
     if (!this.idle) return;
-    for (const c of this.idle.cars) this.idle.pivot.remove(c);
+    for (const c of this.idle.cars) { this.idle.pivot.remove(c); disposeCarMesh(c); }
     this.idle.cars = [];
+    // the model loads asynchronously: if another refresh starts before it lands, only the
+    // latest one adds its car (otherwise two calls in a row would stack two cars)
+    const token = this.idle.token = (this.idle.token || 0) + 1;
     import('./car.js').then(({ buildCarMesh }) => {
+      if (token !== this.idle.token) return;
       const car = getCar(this.profile.selected);
       const m = buildCarMesh(car.shape, PLAYER_COLORS[paintOf(this.profile)]);
       this.idle.pivot.add(m);
