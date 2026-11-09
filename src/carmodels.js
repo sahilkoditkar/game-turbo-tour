@@ -81,6 +81,7 @@ function surfaceTube(k, pts, X, r, mat, side = 1, n = 80) {
  * Modelled on the Lamborghini Huracán EVO: 4.52 m long, 1.93 m wide, 1.17 m tall, 2.62 m wheelbase. */
 MODELS.super = (k) => {
   const M = k.M;
+  k.style = 'arcade';
   const W = { fz: 1.31, rz: -1.31, fr: 0.33, rr: 0.345, fx: 0.815, rx: 0.805, fw: 0.25, rw: 0.31 };
   const body = k.loft([
     [-2.20, 0.84, 0.34, 0.70, 0.90, 6],
@@ -129,10 +130,12 @@ MODELS.super = (k) => {
   k.side(body, quad([2.08, 0.14], [2.12, 0.14], [2.1, 0.34], [2.13, 0.33]), M.paint, { off: 0.008, nu: 1 });
   k.fascia(roundRect(-0.44, 0.15, 0.44, 0.29, 0.03), 2.30, 1, M.grille, 0.04);
   k.plate([[-0.9, 2.0], [0.9, 2.0], [0.86, 2.2], [0.55, 2.33], [-0.55, 2.33], [-0.86, 2.2]], 0.075, 0.025, M.trim);
-  // rear: mesh panel, light blades, hex exhausts, diffuser, ducktail
-  k.fascia(roundRect(-0.8, 0.37, 0.8, 0.68, 0.05), -2.20, -1, M.grille, 0.04);
-  k.fascia2([[0.22, 0.755], [0.8, 0.755], [0.83, 0.80], [0.24, 0.80]], -2.20, -1, M.tail, 0.03);
-  k.fascia2([[0.60, 0.62], [0.64, 0.62], [0.71, 0.755], [0.67, 0.755]], -2.20, -1, M.tail, 0.03);
+  // rear: mesh panel, bold Y-shaped light clusters in black bezels with a glow, hex exhausts, diffuser, ducktail
+  k.fascia(roundRect(-0.8, 0.37, 0.8, 0.66, 0.05), -2.20, -1, M.grille, 0.04);
+  k.fascia2([[0.16, 0.69], [0.82, 0.69], [0.86, 0.865], [0.18, 0.865]], -2.20, -1, M.gloss, 0.03, [], 0.008);
+  k.fascia2([[0.2, 0.715], [0.8, 0.715], [0.83, 0.84], [0.22, 0.84]], -2.20, -1, M.tail, 0.03, [], 0.016);
+  k.fascia2([[0.54, 0.55], [0.66, 0.55], [0.76, 0.715], [0.64, 0.715]], -2.20, -1, M.tail, 0.03, [], 0.016);
+  sym(s => k.glow(s * 0.52, 0.76, -2.20, 0.95, 0.42, -1));
   sym(s => {
     k.cyl(0.075, 0.075, 0.12, s * 0.17, 0.56, -2.21, M.chrome, 'z', 6, true).rotation.z = Math.PI / 6;
     k.cyl(0.06, 0.06, 0.02, s * 0.17, 0.56, -2.16, M.grille, 'z', 6).rotation.z = Math.PI / 6;
