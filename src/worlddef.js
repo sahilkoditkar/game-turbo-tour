@@ -235,7 +235,7 @@ export const EVENTS = [
 export const CHAMPIONSHIPS = [
   { series: 'rookie', road: 'farm2', at: [-1000, 1550] },
   { series: 'pro', road: 'canyon', at: [2700, -760] },
-  { series: 'gp', road: 'coast', at: [-2700, 1250] },
+  { series: 'gp', road: 'timber', at: [-2580, -1050] },   // Timberline Road, deep in Pinewood Hills
   { series: 'legends', road: 'mesa', at: [1500, -2050] },
 ];
 
