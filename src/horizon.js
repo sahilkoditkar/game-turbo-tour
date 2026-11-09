@@ -284,7 +284,7 @@ export class Horizon {
     this.scene.add(sea);
 
     // Shared terrain material: flat region colours, with light bands across each road near it
-    this.terrainMat = bandMaterial(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), { near: 45, far: 75, lift: 0.13 });
+    this.terrainMat = bandMaterial(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), { near: 70, far: 110, lift: 0.7 });
   }
 
   // ------------------------------------------------------------ Props (markers, gantries, boards)
@@ -429,7 +429,7 @@ export class Horizon {
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
     addBandAttributes(geo, (x, z) => {
-      const nr = W.nearestGlobal(x, z, 1);
+      const nr = W.nearestGlobal(x, z, 3);   // 40 m cells: reaches past the 110 m fade
       return nr.idx < 0 ? { s: 0, dist: 1e4 } : { s: W.samples[nr.idx].li * 2, dist: nr.dist };
     }, x0, z0);
     const mesh = new THREE.Mesh(geo, this.terrainMat);
