@@ -6,10 +6,10 @@ import { World, fbm, smoothstep, mulberry32, coastDist } from './world.js';
 import { Car } from './car.js';
 import { disposeCarMesh } from './carmodels.js';
 import { DriftFx } from './fx.js';
-import { buildSun, aimSun, buildEnvironment, updateChaseCamera, snapChaseCamera } from './scenekit.js';
+import { buildSun, aimSun, buildEnvironment, disposeEnvironment, updateChaseCamera, snapChaseCamera } from './scenekit.js';
 import { buildSky } from './sky.js';
 import { addBandAttributes, bandMaterial } from './bands.js';
-import { addTrees, addVegetation } from './nature.js';
+import { vegetationMesh } from './nature.js';
 import { HorizonHUD } from './horizonhud.js';
 import { Traffic } from './traffic.js';
 import { PropKit, mergeByMaterial } from './props.js';
@@ -23,6 +23,7 @@ import { crashShake } from './crash.js';
 const CHUNK = 200;        // metres
 const SEG = 20;           // terrain cells per chunk side (10 m)
 const VIEW_R = 1150;      // chunks are kept within this radius of the player
+const PROP_DRAW = 900;    // markers, gantries and boards further than this are not drawn (beams always are)
 const clamp = THREE.MathUtils.clamp;
 
 const ROAD_COLORS = { highway: 0x3a3a40, road: 0x3c3c42, lane: 0x45444a, dirt: 0x8a7352, street: 0x36363c, pad: 0x3b3b41 };
@@ -83,7 +84,7 @@ export class Horizon {
     this.hud = new HorizonHUD(this);
     if (['new', 'moved', 'event'].includes(this.prog.guide)) this._guideStep(this.prog.guide);
     this.resize();
-    this._streamChunks(true);
+    this._streamChunks(true); this._cullProps(true);
     snapChaseCamera(this.camera, this.car, this.tmp2);
     this._setupAudio();
     this.input.setTouchVisible(true);
@@ -182,7 +183,9 @@ export class Horizon {
   // ------------------------------------------------------------ Roads
   _buildRoads() {
     const g = new THREE.Group();
-    const texByKind = {};
+    const pieces = [];   // every strip, merged below into one mesh per material per map tile
+    const add = (geo, mat) => pieces.push([geo, mat]);
+    const texByKind = {}, matByKind = {}, shMats = {};
     const padTex = makeWorldRoadTexture('pad', 0);
     const padMat = new THREE.MeshStandardMaterial({ map: padTex, roughness: 0.9, metalness: 0.02 });
     for (const road of this.world.roads) {
@@ -191,34 +194,37 @@ export class Horizon {
       const yo = road.yOff;
       const reps = road.closed ? Math.max(1, Math.round(road.length / 14)) : road.length / 14;
       const uv = (li, side) => [side === 0 ? 0 : 1, (li / road.n) * reps];
-      const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: road.kind === 'dirt' ? 1 : 0.9, metalness: 0.02 });
+      const mat = matByKind[road.kind] || (matByKind[road.kind] = new THREE.MeshStandardMaterial({ map: tex, roughness: road.kind === 'dirt' ? 1 : 0.9, metalness: 0.02 }));
       // Inside junctions the surface is plain asphalt (no edge or centre lines running
       // across the other road). A minor road there sits a few centimetres under the
       // major so the two never fight; both lie on the major road's surface.
       const W = this.world;
       const inJ = (li) => !!W.samples[road.i0 + (li % road.n)].jz;
       for (const [a, b] of runs(road, (li) => !inJ(li))) {
-        const m = new THREE.Mesh(this._strip(road, (s) => s.hw, (s) => -s.hw, yo, yo, uv, a, b), mat); m.receiveShadow = true; g.add(m);
+        add(this._strip(road, (s) => s.hw, (s) => -s.hw, yo, yo, uv, a, b), mat);
       }
       for (const [a, b] of runs(road, inJ)) {
         const sub = W.samples[road.i0 + (a % road.n)].jroad !== undefined ? -0.035 : 0;
-        const m = new THREE.Mesh(this._strip(road, (s) => s.hw, (s) => -s.hw, yo + sub, yo + sub, uv, a, b, true), road.kind === 'dirt' ? mat : padMat); m.receiveShadow = true; g.add(m);
+        add(this._strip(road, (s) => s.hw, (s) => -s.hw, yo + sub, yo + sub, uv, a, b, true), road.kind === 'dirt' ? mat : padMat);
       }
       // shoulders: a pavement kerb in the city, a sloping gravel verge elsewhere; dropped
       // on whichever side another road joins
       const street = road.kind === 'street';
       const shW = street ? 2.4 : 2.8;
       const shColor = street ? 0x9a9ca2 : (road.kind === 'dirt' ? 0x7f6b4e : 0x8e8a7c);
-      const shMat = new THREE.MeshStandardMaterial({ color: shColor, roughness: 1 });
+      const shMat = shMats[shColor] || (shMats[shColor] = new THREE.MeshStandardMaterial({ color: shColor, roughness: 1 }));
       const yOuter = street ? yo + 0.14 : yo - 0.1, yInner = street ? yo + 0.14 : yo;
       const sideOk = (key) => (li) => !W.samples[road.i0 + (li % road.n)][key];
       for (const [a, b] of runs(road, sideOk('noL'))) {
-        const m = new THREE.Mesh(this._strip(road, (s) => s.hw + shW, (s) => s.hw, yOuter, yInner, null, a, b, true), shMat); m.receiveShadow = true; g.add(m);
+        add(this._strip(road, (s) => s.hw + shW, (s) => s.hw, yOuter, yInner, null, a, b, true), shMat);
       }
       for (const [a, b] of runs(road, sideOk('noR'))) {
-        const m = new THREE.Mesh(this._strip(road, (s) => -s.hw, (s) => -s.hw - shW, yInner, yOuter, null, a, b, true), shMat); m.receiveShadow = true; g.add(m);
+        add(this._strip(road, (s) => -s.hw, (s) => -s.hw - shW, yInner, yOuter, null, a, b, true), shMat);
       }
     }
+    // one draw call per material per 1 km tile instead of one per strip (a road was dozens of
+    // strips between its junctions and verge gaps); tiles out of view are still culled
+    for (const m of mergeByTile(pieces, 1000)) { m.receiveShadow = true; g.add(m); }
     this.roadGroup = g;
     this.scene.add(g);
   }
@@ -368,6 +374,24 @@ export class Horizon {
     this.scene.add(g);
   }
 
+  /**
+   * Markers stand all over the island in one group, so without this every gantry, sign, ring
+   * and board was drawn even kilometres away in the haze. Beyond PROP_DRAW metres they are
+   * hidden; the tall light beams (the way to find an event from afar) always show.
+   */
+  _cullProps(force = false) {
+    if (!this.props || !this.car) return;
+    this.propCull = (this.propCull || 0) - 1;
+    if (this.propCull > 0 && !force) return;
+    this.propCull = 10;   // every 10 frames is plenty at driving speed
+    const p = this.car.pos, r2 = PROP_DRAW * PROP_DRAW;
+    for (const o of this.props.children) {
+      if (o.userData.beam) continue;
+      const dx = o.position.x - p.x, dz = o.position.z - p.z;
+      o.visible = dx * dx + dz * dz < r2;
+    }
+  }
+
   // ------------------------------------------------------------ Chunk streaming
   _chunkKey(cx, cz) { return `${cx},${cz}`; }
 
@@ -465,9 +489,9 @@ export class Horizon {
       };
       const q = this.highQ ? 1 : 0.55;
       const trees = spot(Math.round(density * CHUNK * CHUNK * q), 6.5, [0.75, 0.6]);
-      if (trees.length) addVegetation(group, biome, trees, this.highQ, 'trees');
       const under = spot(Math.round(Math.max(6, density * CHUNK * CHUNK * 0.6) * q), 3.5, [0.7, 0.9]);
-      if (under.length) addVegetation(group, biome, under, this.highQ, 'under');
+      const veg = vegetationMesh([[biome, trees, 'trees'], [biome, under, 'under']], this.highQ);   // one draw call per chunk
+      if (veg) group.add(veg);
     }
 
     // City blocks: buildings on lots between the streets
@@ -526,7 +550,8 @@ export class Horizon {
         trees.push([x, z, 0.8 + ((k * 37) % 10) / 25, a, W.terrainHeight(x, z)]);
       }
     }
-    if (trees.length) addTrees(chunk.group, 'park', trees, this.highQ);
+    const park = vegetationMesh([['park', trees, 'trees']], this.highQ);
+    if (park) chunk.group.add(park);
   }
 
   // ------------------------------------------------------------ Game loop
@@ -547,7 +572,7 @@ export class Horizon {
     if (marker) this.placeAt(marker.idx, 4);
     this.car.input.throttle = 0; this.car.input.brake = 0;
     this.hud.show();
-    this._streamChunks(true);
+    this._streamChunks(true); this._cullProps(true);
     snapChaseCamera(this.camera, this.car, this.tmp2);
     this._setupAudio();
     this.input.setTouchVisible(true);
@@ -559,7 +584,7 @@ export class Horizon {
     this.placeAt(marker.idx, 4);
     this._updateRoute();
     this.endDrift(true); this.zone = null;
-    this._streamChunks(true);
+    this._streamChunks(true); this._cullProps(true);
     snapChaseCamera(this.camera, this.car, this.tmp2);
     this.promptCooldown = 2;
     this.hud.popup(marker.name.toUpperCase(), 'fast travel');
@@ -625,6 +650,7 @@ export class Horizon {
     for (const ring of this.eventRings) ring.material.opacity = 0.45 + 0.3 * Math.sin(this.time * 3);
 
     this._streamChunks(false);
+    this._cullProps();
     this.hud.update(dt);
 
     this.saveTimer += dt;
@@ -941,7 +967,7 @@ export class Horizon {
     this.hud.dispose();
     this.fx.dispose();
     this.input.setTouchVisible(false);
-    if (this.envTex) this.envTex.dispose();
+    disposeEnvironment(this.envTex);
     disposeGroup(this.scene, true);
   }
 }
@@ -952,6 +978,45 @@ export class Horizon {
  * [from, to] pairs (inclusive, sharing their end samples so strips join up). A loop's
  * run may continue past N - 1 (indices are taken modulo N).
  */
+/**
+ * Merge [geometry, material] pieces into one mesh per material per square tile (by the
+ * piece's centre). Pieces carry position, normal and uv; the source geometries are freed.
+ */
+function mergeByTile(pieces, tile) {
+  const bins = new Map();
+  for (const [geo, mat] of pieces) {
+    geo.computeBoundingBox();
+    const c = geo.boundingBox.getCenter(new THREE.Vector3());
+    const key = mat.uuid + ':' + Math.floor(c.x / tile) + ',' + Math.floor(c.z / tile);
+    if (!bins.has(key)) bins.set(key, { mat, list: [] });
+    bins.get(key).list.push(geo);
+  }
+  const out = [];
+  for (const { mat, list } of bins.values()) {
+    let nv = 0, ni = 0;
+    for (const g of list) { nv += g.attributes.position.count; ni += g.index.count; }
+    const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), uv = new Float32Array(nv * 2), idx = new Uint32Array(ni);
+    let vo = 0, io = 0;
+    for (const g of list) {
+      pos.set(g.attributes.position.array, vo * 3);
+      nor.set(g.attributes.normal.array, vo * 3);
+      uv.set(g.attributes.uv.array, vo * 2);
+      const I = g.index.array;
+      for (let i = 0; i < I.length; i++) idx[io++] = I[i] + vo;
+      vo += g.attributes.position.count;
+      g.dispose();
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    geo.computeBoundingSphere();
+    out.push(new THREE.Mesh(geo, mat));
+  }
+  return out;
+}
+
 function runs(road, keep) {
   const N = road.n, last = road.closed ? N : N - 1;
   const out = [];
@@ -1092,6 +1157,7 @@ function makeSign(text, color, x, y, z, heading) {
 /** Tall translucent light beam marking a point of interest from afar. */
 function makeBeam(color, x, y, z, h) {
   const m = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.6, h, 10, 1, true), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+  m.userData.beam = true;   // always drawn: see Horizon._cullProps
   m.position.set(x, y + h / 2, z);
   return m;
 }

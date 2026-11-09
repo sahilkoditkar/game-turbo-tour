@@ -260,5 +260,48 @@ export function addVegetation(g, biome, positions, highQ, layer = 'trees') {
   }
 }
 
+/**
+ * The same plants as addVegetation, baked into one mesh: one draw call for everything in
+ * `parts` ([[biome, positions, layer], ...]) instead of one per species and layer. Used for
+ * the open world's terrain chunks, where instancing per species meant a few hundred calls.
+ */
+export function vegetationMesh(parts, highQ) {
+  const items = [];
+  for (const [biomeIn, positions, layer] of parts) {
+    const biome = KIND_BIOME[biomeIn] || biomeIn;
+    const table = (layer === 'under' ? UNDER : TREES)[biome];
+    if (!table) continue;
+    for (const p of positions) items.push([species(pick(table, hash(p[0], p[1], layer === 'under' ? 5 : 1))), p, layer]);
+  }
+  if (!items.length) return null;
+  let n = 0;
+  for (const [g] of items) n += g.attributes.position.count;
+  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3);
+  const m = new THREE.Matrix4(), nm = new THREE.Matrix3(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc3 = new THREE.Vector3();
+  const up = new THREE.Vector3(0, 1, 0);
+  let o = 0;
+  for (const [g, [x, z, sc, rot, y = 0], layer] of items) {
+    q.setFromAxisAngle(up, rot);
+    const squash = layer === 'under' ? 0.8 + hash(x, z, 9) * 0.5 : 1;
+    m.compose(v.set(x, y - 0.25 * sc, z), q, sc3.set(sc, sc * squash, sc));
+    nm.getNormalMatrix(m);
+    const l = 0.9 + hash(x, z, 3) * 0.2, lb = l * (0.96 + hash(z, x, 4) * 0.08);   // the same per-plant shade as the instanced version
+    const P = g.attributes.position, N = g.attributes.normal, C = g.attributes.color;
+    for (let i = 0; i < P.count; i++, o++) {
+      v.fromBufferAttribute(P, i).applyMatrix4(m); pos[o * 3] = v.x; pos[o * 3 + 1] = v.y; pos[o * 3 + 2] = v.z;
+      v.fromBufferAttribute(N, i).applyMatrix3(nm).normalize(); nor[o * 3] = v.x; nor[o * 3 + 1] = v.y; nor[o * 3 + 2] = v.z;
+      col[o * 3] = C.getX(i) * l; col[o * 3 + 1] = C.getY(i) * l; col[o * 3 + 2] = C.getZ(i) * lb;
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.computeBoundingSphere();
+  const mesh = new THREE.Mesh(geo, material());
+  mesh.castShadow = highQ;
+  return mesh;
+}
+
 /** Backwards-compatible entry point: trees of one kind or biome. */
 export function addTrees(g, kind, positions, highQ) { addVegetation(g, kind, positions, highQ, 'trees'); }

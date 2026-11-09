@@ -41,7 +41,7 @@ export function aimSun(sun, focus) {
   sun.target.position.copy(focus);
 }
 
-/** Cheap procedural environment map so paint and glass have reflections. */
+/** Cheap procedural environment map so paint and glass have reflections. Free it with disposeEnvironment(). */
 export function buildEnvironment(renderer, th) {
   const env = new THREE.Scene();
   const skyMat = new THREE.ShaderMaterial({
@@ -55,9 +55,17 @@ export function buildEnvironment(renderer, th) {
   sunDisc.position.set(20, 30, 14);
   env.add(sunDisc);
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const tex = pmrem.fromScene(env, 0.04).texture;
+  const rt = pmrem.fromScene(env, 0.04);
   pmrem.dispose();
-  return tex;
+  env.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+  rt.texture.userData.renderTarget = rt;   // free it with disposeEnvironment(): the texture alone can't release a render target
+  return rt.texture;
+}
+
+/** Free an environment map from buildEnvironment (its render target, not just the texture). */
+export function disposeEnvironment(tex) {
+  if (!tex) return;
+  if (tex.userData.renderTarget) tex.userData.renderTarget.dispose(); else tex.dispose();
 }
 
 /**
