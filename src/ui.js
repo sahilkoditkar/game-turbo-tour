@@ -394,9 +394,9 @@ export class UI {
           </div>
           <div class="gx-side">
             <div class="row between gx-head"><h1>${car.name}</h1>${badge}</div>
-            <p class="gx-desc">${car.desc}</p>
-            ${this._statBars(effectiveStats(car, p.upgrades[car.id] || {}))}
-            ${section}
+            <div class="gx-info"><p class="gx-desc">${car.desc}</p>
+            ${this._statBars(effectiveStats(car, p.upgrades[car.id] || {}))}</div>
+            <div class="gx-act">${section}</div>
             <div class="meta gx-else">${elsewhere}</div>
           </div>
           <div class="gx-bottom">

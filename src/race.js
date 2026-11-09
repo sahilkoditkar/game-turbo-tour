@@ -6,7 +6,7 @@ import { driveAI } from './ai.js';
 import { collideCars, crashShake } from './crash.js';
 import { HUD } from './hud.js';
 import { DriftFx } from './fx.js';
-import { buildSun, aimSun, buildEnvironment, disposeMaterial, releaseShadowTextures, updateChaseCamera, snapChaseCamera } from './scenekit.js';
+import { buildSun, aimSun, buildEnvironment, disposeEnvironment, disposeScene, releaseShadowTextures, updateChaseCamera, snapChaseCamera } from './scenekit.js';
 import { buildSky, buildBackdrop } from './sky.js';
 
 const clamp = THREE.MathUtils.clamp;
@@ -67,8 +67,8 @@ export class Race {
   }
 
   _environment() {
-    this.envRT = buildEnvironment(this.renderer, this.theme);
-    this.scene.environment = this.envRT.texture;
+    this.envTex = buildEnvironment(this.renderer, this.theme);
+    this.scene.environment = this.envTex;
     this.scene.environmentIntensity = this.theme.night ? 0.5 : 0.9;
   }
 
@@ -449,14 +449,9 @@ export class Race {
     this.audio.stopEngines();
     this.hud.dispose();
     this.fx.dispose();
-    if (this.envRT) this.envRT.dispose();
+    disposeEnvironment(this.envTex);
     this.input.setTouchVisible(false);
-    // the sun's shadow map is a render target of its own: free it with the light
-    this.scene.traverse(o => { if (o.isLight) o.dispose(); });
-    this.scene.traverse(o => {
-      if (o.geometry) o.geometry.dispose();
-      if (o.material) for (const m of [].concat(o.material)) disposeMaterial(m);
-    });
+    disposeScene(this.scene);
     releaseShadowTextures(this.renderer);
   }
 }

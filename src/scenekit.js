@@ -41,15 +41,25 @@ export function aimSun(sun, focus) {
   sun.target.position.copy(focus);
 }
 
-/**
- * Free a material and every texture it holds (map, emissiveMap, alphaMap, ... and shader
- * uniforms), not just `map`. With `keepShared`, textures marked `userData.shared` are kept.
- */
-export function disposeMaterial(m, keepShared = false) {
-  const free = (v) => { if (v && v.isTexture && !(keepShared && v.userData.shared)) v.dispose(); };
-  for (const v of Object.values(m)) free(v);
-  if (m.uniforms) for (const u of Object.values(m.uniforms)) free(u && u.value);
-  m.dispose();
+/** Cheap procedural environment map so paint and glass have reflections. Free it with disposeEnvironment(). */
+export function buildEnvironment(renderer, th) {
+  const env = new THREE.Scene();
+  const skyMat = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    uniforms: { top: { value: new THREE.Color(th.sky) }, bottom: { value: new THREE.Color(th.ground) }, horizon: { value: new THREE.Color(th.fog) } },
+    vertexShader: 'varying vec3 vW; void main(){ vW = (modelMatrix * vec4(position,1.0)).xyz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+    fragmentShader: 'uniform vec3 top; uniform vec3 bottom; uniform vec3 horizon; varying vec3 vW; void main(){ float h = normalize(vW).y; vec3 c = h > 0.0 ? mix(horizon, top, pow(h, 0.6)) : mix(horizon, bottom, pow(-h, 0.5)); gl_FragColor = vec4(c, 1.0); }',
+  });
+  env.add(new THREE.Mesh(new THREE.SphereGeometry(50, 16, 8), skyMat));
+  const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(4, 8, 8), new THREE.MeshBasicMaterial({ color: th.night ? 0x334466 : 0xffffff }));
+  sunDisc.position.set(20, 30, 14);
+  env.add(sunDisc);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const rt = pmrem.fromScene(env, 0.04);
+  pmrem.dispose();
+  env.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+  rt.texture.userData.renderTarget = rt;   // free it with disposeEnvironment(): the texture alone can't release a render target
+  return rt.texture;
 }
 
 let FLUSH = null;
@@ -81,27 +91,27 @@ export function releaseShadowTextures(renderer) {
 }
 
 /**
- * Cheap procedural environment map so paint and glass have reflections. Returns the PMREM
- * render target: use `.texture`, and free it with `dispose()` on the target (disposing only
- * the texture leaves the target's framebuffer behind).
+ * Free everything a scene holds on the GPU when a race or the open world closes: geometry,
+ * every texture a material uses (map, emissiveMap, ...), the materials, and the lights'
+ * shadow maps. Shared car-model geometry freed here is simply uploaded again when next used.
  */
-export function buildEnvironment(renderer, th) {
-  const env = new THREE.Scene();
-  const skyMat = new THREE.ShaderMaterial({
-    side: THREE.BackSide,
-    uniforms: { top: { value: new THREE.Color(th.sky) }, bottom: { value: new THREE.Color(th.ground) }, horizon: { value: new THREE.Color(th.fog) } },
-    vertexShader: 'varying vec3 vW; void main(){ vW = (modelMatrix * vec4(position,1.0)).xyz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-    fragmentShader: 'uniform vec3 top; uniform vec3 bottom; uniform vec3 horizon; varying vec3 vW; void main(){ float h = normalize(vW).y; vec3 c = h > 0.0 ? mix(horizon, top, pow(h, 0.6)) : mix(horizon, bottom, pow(-h, 0.5)); gl_FragColor = vec4(c, 1.0); }',
+export function disposeScene(root) {
+  root.traverse((o) => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.isLight && o.dispose) o.dispose();
+    if (!o.material) return;
+    for (const m of [].concat(o.material)) {
+      for (const k of Object.keys(m)) if (m[k] && m[k].isTexture) m[k].dispose();
+      if (m.uniforms) for (const u of Object.values(m.uniforms)) if (u && u.value && u.value.isTexture) u.value.dispose();
+      m.dispose();
+    }
   });
-  env.add(new THREE.Mesh(new THREE.SphereGeometry(50, 16, 8), skyMat));
-  const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(4, 8, 8), new THREE.MeshBasicMaterial({ color: th.night ? 0x334466 : 0xffffff }));
-  sunDisc.position.set(20, 30, 14);
-  env.add(sunDisc);
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  const rt = pmrem.fromScene(env, 0.04);
-  pmrem.dispose();
-  env.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
-  return rt;
+}
+
+/** Free an environment map from buildEnvironment (its render target, not just the texture). */
+export function disposeEnvironment(tex) {
+  if (!tex) return;
+  if (tex.userData.renderTarget) tex.userData.renderTarget.dispose(); else tex.dispose();
 }
 
 /**
