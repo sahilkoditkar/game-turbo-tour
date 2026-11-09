@@ -1055,6 +1055,24 @@ function instanceMaterials(color, style) {
   return { paint, accent, accent2, tail, glow, plate, num };
 }
 
+/**
+ * Free what one car from buildCarMesh owns: its paint, livery, lamp and glow materials and
+ * its number-plate textures. The geometry and the other materials belong to the shared model
+ * template, which every later car of that shape reuses, so they are left alone.
+ */
+export function disposeCarMesh(mesh) {
+  const seen = new Set();
+  mesh.traverse((o) => {
+    if (!o.isMesh) return;
+    for (const m of [].concat(o.material)) {
+      if (!m || seen.has(m) || !m.userData.role) continue;
+      seen.add(m);
+      if (m.userData.role === 'plate' || m.userData.role === 'num') m.map?.dispose();   // per-car canvas textures (the glow sprite is shared)
+      m.dispose();
+    }
+  });
+}
+
 /** Switch a car's brake lights (lamps and their glow halos) on or off. */
 export function setBrakeLights(list, on) {
   for (const l of list) {

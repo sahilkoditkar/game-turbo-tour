@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { World, fbm, smoothstep, mulberry32, coastDist } from './world.js';
 import { Car } from './car.js';
+import { disposeCarMesh } from './carmodels.js';
 import { DriftFx } from './fx.js';
 import { buildSun, aimSun, buildEnvironment, updateChaseCamera, snapChaseCamera } from './scenekit.js';
 import { buildSky } from './sky.js';
@@ -119,7 +120,8 @@ export class Horizon {
   swapCar() {
     const old = this.car;
     const { x, z } = old.pos, heading = old.heading, idx = old.trackIdx, y = old.pos.y;
-    this.scene.remove(old.mesh);   // not disposed: a car's geometry belongs to a template shared with every other car
+    this.scene.remove(old.mesh);
+    disposeCarMesh(old.mesh);      // its own paint and plate textures; the geometry belongs to the shared model template
     this._makeCar();
     this.car.trackIdx = idx;
     this.car.place(x, z, heading, y);

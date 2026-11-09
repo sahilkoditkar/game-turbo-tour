@@ -4,7 +4,7 @@
 // glass showroom looking out over Turbo City, Festival HQ the festival's own garage, a
 // tuning shop a workshop with tyre stacks and a lift.
 import * as THREE from 'three';
-import { buildCarMesh } from './carmodels.js';
+import { buildCarMesh, disposeCarMesh } from './carmodels.js';
 
 const THEMES = {
   dealer: {   // night showroom: glossy dark floor, cool white light, the city through the glass
@@ -78,7 +78,8 @@ export class GarageStage {
       l.position.set(x, y, z); l.lookAt(0, 0, 0); env.add(l);
     }
     const g = new THREE.Mesh(new THREE.CircleGeometry(30, 16), new THREE.MeshBasicMaterial({ color: 0x1a1c20 })); g.rotation.x = -Math.PI / 2; g.position.y = -1; env.add(g);
-    this.envTex = pm.fromScene(env, 0.03).texture;
+    this.envRT = pm.fromScene(env, 0.03);   // a render target: free it with dispose() on the target, not its texture
+    this.envTex = this.envRT.texture;
     scene.environment = this.envTex;
     env.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
     pm.dispose();
@@ -301,8 +302,12 @@ export class GarageStage {
 
   dispose() {
     for (const [ev, fn] of this.listeners) removeEventListener(ev, fn);
+    // the key light's 2048x2048 shadow map is a render target of its own: free it with the light
+    this.scene.traverse(o => { if (o.isLight) o.dispose(); });
     for (const o of this.owned) o.dispose();
-    this.envTex.dispose();
+    // every car shown on the turntable has its own paint and number-plate textures
+    for (const m of this.meshes.values()) disposeCarMesh(m);
+    this.envRT.dispose();
     this.meshes.clear();
     this.scene.clear();
   }
