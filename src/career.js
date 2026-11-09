@@ -1,4 +1,4 @@
-import { CARS, SERIES, UPGRADES, AI_DRIVERS, AI_COLORS, POINTS, RETIRED_CARS, upgradeCost, effectiveStats, getCar, getSeries } from './data.js';
+import { CARS, SERIES, UPGRADES, AI_DRIVERS, AI_COLORS, POINTS, RETIRED_CARS, PAINT_COST, upgradeCost, effectiveStats, getCar, getSeries } from './data.js';
 import { levelForXp } from './worlddef.js';
 
 const KEY = 'turbotour.save.v1';
@@ -6,7 +6,7 @@ const OLD_KEY = 'apexrush.save.v1'; // pre-rename save, migrated once on load
 
 export function defaultProfile() {
   return {
-    name: 'You', money: 5000, cars: ['classic'], selected: 'classic', colorIndex: 0,
+    name: 'You', money: 5000, cars: ['classic'], selected: 'classic', colorIndex: 0, paint: {},
     upgrades: { classic: { engine: 0, tires: 0, brakes: 0, aero: 0 } },
     series: {}, stats: { races: 0, wins: 0, podiums: 0, earned: 0 },
     bestLaps: {},
@@ -110,11 +110,28 @@ export function buyUpgrade(profile, carId, upId) {
   return true;
 }
 
-export function buyCar(profile, carId) {
+/** A car's paint (index into PLAYER_COLORS). Each car keeps its own; colorIndex is the old single colour, used until a car is painted. */
+export function paintOf(profile, carId = profile.selected) {
+  const v = profile.paint && profile.paint[carId];
+  return v ?? profile.colorIndex ?? 0;
+}
+
+/** Respray a car you own: PAINT_COST credits. Returns false (and changes nothing) if it is already that colour or you can't pay. */
+export function setPaint(profile, carId, index) {
+  if (paintOf(profile, carId) === index || profile.money < PAINT_COST) return false;
+  profile.money -= PAINT_COST;
+  profile.paint = profile.paint || {};
+  profile.paint[carId] = index;
+  saveProfile(profile);
+  return true;
+}
+
+export function buyCar(profile, carId, paint) {
   const car = getCar(carId);
   if (profile.cars.includes(carId) || profile.money < car.price) return false;
   profile.money -= car.price;
   profile.cars.push(carId);
+  if (paint !== undefined) { profile.paint = profile.paint || {}; profile.paint[carId] = paint; }
   profile.upgrades[carId] = { engine: 0, tires: 0, brakes: 0, aero: 0 };
   profile.selected = carId;
   saveProfile(profile);

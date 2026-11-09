@@ -91,8 +91,9 @@ website, so it is hosted directly on GitHub Pages (or any static host).
   Sliding tyres lay rubber on the road and throw up smoke (or dust off the track).
 - **Split-screen multiplayer**: two players on one keyboard (WASD vs arrow keys) or two gamepads.
   The screen splits left/right on wide displays and top/bottom on tall ones.
-- Championships have points standings and prize money; the garage sells nine cars and has four
-  upgrade lines and paint. Progress is saved in the browser (`localStorage`).
+- Championships have points standings and prize money; Turbo Motors sells eleven cars (the Retro 62
+  Roadster is your starter), with four upgrade lines and twelve paints, kept per car (a respray at
+  Festival HQ costs 250 cr). Progress is saved in the browser (`localStorage`).
 - Quick Race and Time Trial modes with adjustable laps, opponent count and AI difficulty
   (Easy, Medium, Hard, or **Dynamic**, where the AI measures its time gap to you continuously and
   paces itself around you: a couple of drivers just ahead, most just behind, on circuits and stages).

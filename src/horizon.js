@@ -14,7 +14,7 @@ import { Traffic } from './traffic.js';
 import { PropKit, mergeByMaterial } from './props.js';
 import { getCar, getSeries, PLAYER_COLORS } from './data.js';
 import { getTrack } from './tracks.js';
-import { playerStats, seriesState, seriesLock } from './career.js';
+import { playerStats, seriesState, seriesLock, paintOf } from './career.js';
 import { getControl } from './input.js';
 import { WORLD_HALF, SEA_Z, SEA_LEVEL, CITY, CITY_OUTSKIRTS, BOARD_XP, REGIONS, levelForXp } from './worlddef.js';
 import { crashShake } from './crash.js';
@@ -92,7 +92,7 @@ export class Horizon {
   _makeCar() {
     const p = this.profile;
     const carDef = getCar(p.selected);
-    this.car = new Car({ name: p.name, color: PLAYER_COLORS[p.colorIndex || 0], stats: playerStats(p), shape: carDef.shape, isPlayer: true, playerIndex: 0, quality: this.quality });
+    this.car = new Car({ name: p.name, color: PLAYER_COLORS[paintOf(p)], stats: playerStats(p), shape: carDef.shape, isPlayer: true, playerIndex: 0, quality: this.quality });
     this.scene.add(this.car.mesh);
   }
 

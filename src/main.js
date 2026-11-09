@@ -9,7 +9,7 @@ import { getTrack } from './tracks.js';
 import { getCar, getSeries, PLAYER_COLORS, effectiveStats } from './data.js';
 import {
   loadProfile, saveProfile, resetProfile, seriesState, seriesField, quickField, playerStats,
-  applyCareerResult, restartSeries, buyCar, buyUpgrade, recordBestLap,
+  applyCareerResult, restartSeries, buyCar, buyUpgrade, recordBestLap, paintOf,
 } from './career.js';
 
 // The static About section in index.html is for crawlers and no-JS visitors; with JS running it
@@ -116,7 +116,7 @@ class App {
     this.idle.cars = [];
     import('./car.js').then(({ buildCarMesh }) => {
       const car = getCar(this.profile.selected);
-      const m = buildCarMesh(car.shape, PLAYER_COLORS[this.profile.colorIndex || 0]);
+      const m = buildCarMesh(car.shape, PLAYER_COLORS[paintOf(this.profile)]);
       this.idle.pivot.add(m);
       this.idle.cars.push(m);
     });
@@ -245,7 +245,7 @@ class App {
     if (!ev) return;
     const track = getTrack(ev.track);
     const car = getCar(this.profile.selected);
-    const players = [this._playerEntry({ name: this.profile.name, colorIndex: this.profile.colorIndex || 0, control: this.profile.settings.p1Control }, 0, playerStats(this.profile), car.shape)];
+    const players = [this._playerEntry({ name: this.profile.name, colorIndex: paintOf(this.profile), control: this.profile.settings.p1Control }, 0, playerStats(this.profile), car.shape)];
     const ai = seriesField(series);
     this.startRace({ track, laps: ev.laps, players, ai, mode: 'career', quality: this.profile.settings.quality },
       { mode: 'career', seriesId, trackName: track.name, laps: ev.laps, trackId: track.id, carId: car.id, marker });
@@ -273,7 +273,7 @@ class App {
     hz.saveState();
     hz.suspend();
     const car = getCar(this.profile.selected);
-    const players = [this._playerEntry({ name: this.profile.name, colorIndex: this.profile.colorIndex || 0, control: this.profile.settings.p1Control }, 0, playerStats(this.profile), car.shape)];
+    const players = [this._playerEntry({ name: this.profile.name, colorIndex: paintOf(this.profile), control: this.profile.settings.p1Control }, 0, playerStats(this.profile), car.shape)];
     const ai = quickField(marker.ai, 0.85, car.id);
     const laps = marker.track.open ? 1 : marker.laps;
     this.startRace({ track: marker.track, laps, players, ai, mode: 'horizon', dynamic: true, quality: this.profile.settings.quality },
@@ -418,7 +418,7 @@ class App {
   // ------------------------------------------------------------ Profile
   save() { saveProfile(this.profile); }
   resetProfile() { this.profile = resetProfile(); this.setup = null; this._refreshIdleCars(); }
-  buyCar(id) { const ok = buyCar(this.profile, id); if (ok) this._refreshIdleCars(); return ok; }
+  buyCar(id, paint) { const ok = buyCar(this.profile, id, paint); if (ok) this._refreshIdleCars(); return ok; }
   buyUpgrade(carId, upId) { return buyUpgrade(this.profile, carId, upId); }
   restartSeries(id) { restartSeries(this.profile, id); }
 
