@@ -243,7 +243,7 @@ export const THEMES = {
   desert:  { sky: 0xffcf9a, fog: 0xffe0a8, skyTop: 0x3d93e0, skyGlow: 0xfff3cc, skyGlowAmt: 0.5, sunElev: 9, sunSize: 3.4, sunColor: 0xfff0b0, clouds: 0.15, backdrop: 'desert', biome: 'desert', ground: 0xd8b276, groundAlt: 0xc9a163, sun: 1.3, ambient: 0.5, night: false, water: null, buildings: false, road: 0x45403c, hills: 14 },
   forest:  { sky: 0x86c5f5, fog: 0xb6e2ff, skyTop: 0x2a7fe0, skyGlow: 0xfffbe8, skyGlowAmt: 0.2, sunElev: 16, clouds: 0.5, backdrop: 'forest', biome: 'forest', ground: 0x3f7a33, groundAlt: 0x35682b, sun: 1.1, ambient: 0.55, night: false, water: null, buildings: false, road: 0x3a3a40, hills: 16 },
   alpine:  { sky: 0xd9ecff, fog: 0xc4e4ff, skyTop: 0x1f63d0, skyGlow: 0xffffff, skyGlowAmt: 0.2, sunElev: 20, clouds: 0.35, backdrop: 'alpine', biome: 'alpine', ground: 0xeef3f8, groundAlt: 0xdde7f0, sun: 1.0, ambient: 0.7, night: false, water: null, buildings: false, road: 0x33363c, hills: 24 },
-  city:    { sky: 0x0a0c1c, fog: 0x2a1648, skyTop: 0x0b0926, skyGlow: 0xd23f8f, skyGlowAmt: 0.55, backdrop: 'city', biome: null, ground: 0x1c1d25, groundAlt: 0x17181f, sun: 0.35, ambient: 0.25, night: true, water: null, buildings: true, road: 0x2a2b33, hills: 2 },
+  city:    { sky: 0x2a1f6e, fog: 0x3b1f6e, skyTop: 0x0a0a30, skyGlow: 0xff4fa8, skyGlowAmt: 0.85, moon: true, sunElev: 26, sunSize: 1.7, sunColor: 0xd6deff, backdrop: 'city', biome: null, ground: 0x1c1d2a, groundAlt: 0x17181f, sun: 0.45, ambient: 0.42, night: true, water: null, buildings: true, road: 0x3a3c52, hills: 2 },
 };
 
 export function getTrack(id) { return TRACKS.find(t => t.id === id) || TRACKS[0]; }
