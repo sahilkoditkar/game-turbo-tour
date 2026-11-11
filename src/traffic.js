@@ -69,7 +69,8 @@ export class Traffic {
     const mesh = buildCarLOD(shape, color, this.hz.quality);
     this.group.add(mesh);
     // traffic carries a driver and a passenger or two
-    return { mesh, pos: new THREE.Vector3(), wheels: mesh.userData.wheels, front: mesh.userData.frontWheels, brakeLights: mesh.userData.brakeLights, spin: 0, steer: 0, crash: specOf(shape, 150), knock: null };
+    this.nextId = (this.nextId || 0) + 1;
+    return { id: this.nextId, mesh, pos: new THREE.Vector3(), wheels: mesh.userData.wheels, front: mesh.userData.frontWheels, brakeLights: mesh.userData.brakeLights, spin: 0, steer: 0, crash: specOf(shape, 150), knock: null };
   }
 
   _recycle(car) {
