@@ -194,18 +194,6 @@ export class AudioSystem {
     o.connect(g); g.connect(this.master); o.start(t); o.stop(t + dur + 0.02);
   }
 
-  /** A soft tone: quick fade-in (no click), smooth fade-out. */
-  tone(freq, dur, vol, type = 'sine', when = 0) {
-    if (!this.ctx) return;
-    const c = this.ctx, t = c.currentTime + when;
-    const o = c.createOscillator(); o.type = type; o.frequency.value = freq;
-    const g = c.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(this.master); o.start(t); o.stop(t + dur + 0.02);
-  }
-
   impact(strength = 1) {
     if (!this.ctx) return;
     const c = this.ctx, t = c.currentTime;
@@ -219,16 +207,7 @@ export class AudioSystem {
     src.connect(f); f.connect(g); g.connect(this.master); src.start(t);
   }
 
-  /**
-   * Start countdown: 3, 2, 1 are soft round blips; GO is a bright two-note chime (a fifth
-   * and its octave) instead of the old half-second square-wave buzz.
-   */
-  countdown(n) {
-    if (n !== 0) { this.tone(660, 0.22, 0.2, 'triangle'); this.tone(1320, 0.12, 0.04); return; }
-    this.tone(880, 0.55, 0.13);
-    this.tone(1320, 0.6, 0.11, 'sine', 0.06);
-    this.tone(1760, 0.5, 0.05, 'triangle', 0.06);
-  }
+  countdown(n) { this.beep(n === 0 ? 1320 : 660, n === 0 ? 0.5 : 0.18, 'square', 0.22); }
   lap() { this.beep(1046, 0.1, 'sine', 0.25); setTimeout(() => this.beep(1568, 0.16, 'sine', 0.25), 110); }
   click() { this.beep(520, 0.05, 'triangle', 0.12); }
   finish() { [0, 120, 240, 360].forEach((d, i) => setTimeout(() => this.beep([784, 988, 1175, 1568][i], 0.25, 'triangle', 0.25), d)); }
