@@ -164,7 +164,7 @@ export class Horizon {
     this.promptCooldown = 1.5;
   }
 
-  _setupAudio() { this.audio.init(); this.engine = this.audio.createEngine(); }
+  _setupAudio() { this.audio.init(); this.engine = this.audio.createEngine({ road: true }); }
 
   /** Put the car on the road at a sample index, stopped and facing along it. */
   placeAt(idx, back = 0) {
@@ -664,6 +664,14 @@ export class Horizon {
     updateChaseCamera(this.camera, car, dt, this.tmp2);
     aimSun(this.sun, this.tmp2.copy(car.pos));
     if (this.engine) this.audio.updateEngine(this.engine, clamp(car.speed / car.stats.maxSpeed, 0, 1), car.input.throttle, car.drifting || (car.input.handbrake && car.speed > 5), 1);
+    if (this.engine) {
+      const dirt = this.world.roadOf(car.trackIdx)?.kind === 'dirt';
+      this.audio.updateRoad(this.engine, car.speed, car.offroad || dirt);
+      // the traffic nearest the camera
+      const e = this.camera.matrixWorld.elements, rl = Math.hypot(e[0], e[2]) || 1;
+      this.audio.updateCrowd(this.traffic.cars.map(t => ({ key: 'tr' + t.id, x: t.pos.x, z: t.pos.z, speedFrac: clamp(t.speed / 50, 0, 1), throttle: 0.4 })),
+        { x: this.camera.position.x, z: this.camera.position.z, rx: e[0] / rl, rz: e[2] / rl });
+    }
     for (const ring of this.eventRings) ring.material.opacity = 0.45 + 0.3 * Math.sin(this.time * 3);
 
     this._streamChunks(false, dt);

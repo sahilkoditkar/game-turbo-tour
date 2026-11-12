@@ -170,7 +170,7 @@ export class Race {
 
   _setupAudio() {
     this.audio.init();
-    this.engineVoices = this.players.map(() => this.audio.createEngine());
+    this.engineVoices = this.players.map(() => this.audio.createEngine({ road: true }));
   }
 
   resize() {
@@ -259,8 +259,15 @@ export class Race {
       car.carHit = 0;
       this._updateCamera(cam, car, dt);
       const v = this.engineVoices[i];
-      if (v) this.audio.updateEngine(v, clamp(car.speed / car.stats.maxSpeed, 0, 1), car.input.throttle, car.drifting || (car.input.handbrake && car.speed > 5), (this.players.length > 1 ? 0.7 : 1) * (car.finished ? 0.25 : 1));
+      const vg = (this.players.length > 1 ? 0.7 : 1) * (car.finished ? 0.25 : 1);
+      if (v) this.audio.updateEngine(v, clamp(car.speed / car.stats.maxSpeed, 0, 1), car.input.throttle, car.drifting || (car.input.handbrake && car.speed > 5), vg);
+      if (v) this.audio.updateRoad(v, car.speed, car.offroad, vg);
     });
+    // the AI cars nearest player 1's camera
+    const cam0 = this.cameras[0], e = cam0.matrixWorld.elements, rl = Math.hypot(e[0], e[2]) || 1;
+    const others = [];
+    this.cars.forEach((c, i) => { if (!c.isPlayer) others.push({ key: 'ai' + i, x: c.pos.x, z: c.pos.z, speedFrac: clamp(c.speed / c.stats.maxSpeed, 0, 1), throttle: c.input.throttle }); });
+    this.audio.updateCrowd(others, { x: cam0.position.x, z: cam0.position.z, rx: e[0] / rl, rz: e[2] / rl }, this.players.length > 1 ? 0.7 : 1);
 
     // Shadow camera follows the players, snapped to shadow-map texels so edges don't shimmer
     const focus = this.players.length === 1 ? this.players[0].pos.clone() : this.players[0].pos.clone().add(this.players[1].pos).multiplyScalar(0.5);

@@ -74,6 +74,8 @@ class App {
     // First user gesture unlocks audio
     const unlock = () => { this.audio.init(); };
     window.addEventListener('pointerdown', unlock, { once: true });
+    // no engine drone from a background tab or a locked phone
+    document.addEventListener('visibilitychange', () => this.audio.setHidden(document.hidden));
     window.addEventListener('keydown', unlock, { once: true });
 
     this._buildIdleScene();
