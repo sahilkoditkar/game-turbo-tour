@@ -1,6 +1,6 @@
 import { TRACKS, getTrack } from './tracks.js';
 import { CARS, SERIES, UPGRADES, PLAYER_COLORS, PAINT_NAMES, PAINT_COST, getCar, getSeries, upgradeCost, effectiveStats } from './data.js';
-import { listControls, getControl, connectedPads, gamepadDiagnostics } from './input.js';
+import { listControls, getControl, connectedPads, gamepadDiagnostics, TOUCH_DEFAULTS, requestTiltPermission } from './input.js';
 import { seriesState, seriesLock, standings, canBuyUpgrade, paintOf, setPaint } from './career.js';
 import { levelForXp } from './worlddef.js';
 import { fmtTime } from './race.js';
@@ -475,6 +475,7 @@ export class UI {
             <div class="field"><label>Volume</label><input type="range" min="0" max="1" step="0.05" value="${s.volume}" data-vol></div>
             <div class="field"><label>Player 1 controls (default)</label>${this._controlChips(s.p1Control || 'wasd', 'data-ctl="p1Control"', 0)}</div>
             <div class="field"><label>Player 2 controls (default)</label>${this._controlChips(s.p2Control || 'arrows', 'data-ctl="p2Control"', 1)}</div>
+            ${app.input.isTouchDevice ? `<h3>Touch controls</h3>${this._touchFields()}` : ''}
             <button class="small" data-fullscreen>Toggle fullscreen</button>
           </div>
           <div>
@@ -503,7 +504,99 @@ export class UI {
     this.on('[data-vol]', 'input', (e, el) => { s.volume = parseFloat(el.value); app.audio.setVolume(s.volume); app.save(); });
     this.on('[data-ctl]', 'click', (e, el) => { s[el.dataset.ctl] = el.dataset.id; if (app.setup) { app.setup.players[0].control = s.p1Control; app.setup.players[1].control = s.p2Control; } app.save(); this.settings(); });
     this.on('[data-fullscreen]', 'click', () => app.toggleFullscreen());
+    this._bindTouchFields(() => this.settings());
     this.on('[data-reset]', 'click', () => { if (confirm('Delete all career progress, cars and best laps?')) { app.resetProfile(); this.toast('Progress reset'); this.settings(); } });
+  }
+
+  // ------------------------------------------------------------ Touch controls
+  /** A small landscape-phone diagram of where each touch layout puts the controls. */
+  _layoutIcon(id) {
+    const phone = '<rect x="2" y="2" width="116" height="60" rx="9" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.35)" stroke-width="2"/>';
+    const G = '#3ddc84', R = '#ff5a5a', O = '#ff7a3d', W = 'rgba(255,255,255,.75)';
+    const pedals = `<rect x="96" y="26" width="15" height="30" rx="4" fill="${G}" opacity=".8"/><rect x="79" y="36" width="14" height="20" rx="4" fill="${R}" opacity=".8"/><rect x="79" y="24" width="14" height="9" rx="3" fill="${O}" opacity=".8"/>`;
+    const parts = {
+      drag: `<rect x="9" y="38" width="44" height="13" rx="6.5" fill="none" stroke="${W}" stroke-width="1.5"/><circle cx="38" cy="44.5" r="6" fill="${W}"/><path d="M22 44.5h-8m0 0l3-3m-3 3l3 3M44 30h6m0 0l-2.5-2.5M50 30l-2.5 2.5" stroke="${W}" stroke-width="1.3" fill="none"/>${pedals}`,
+      wheel: `<circle cx="28" cy="40" r="14" fill="none" stroke="${W}" stroke-width="3"/><path d="M28 40V54M28 40L16 33M28 40L40 33" stroke="${W}" stroke-width="2"/><circle cx="28" cy="40" r="3.5" fill="${W}"/>${pedals}`,
+      tilt: `<path d="M44 14a24 24 0 0 1 32 0" fill="none" stroke="${W}" stroke-width="1.6"/><path d="M76 14l-5-1m5 1l-1 -5M44 14l5-1m-5 1l1-5" stroke="${W}" stroke-width="1.6"/><rect x="12" y="30" width="22" height="22" rx="5" fill="${R}" opacity=".8"/><rect x="96" y="26" width="15" height="30" rx="4" fill="${G}" opacity=".8"/><rect x="79" y="40" width="14" height="16" rx="3" fill="${O}" opacity=".8"/>`,
+      thumbs: `<circle cx="19" cy="42" r="11" fill="rgba(255,255,255,.15)" stroke="${W}" stroke-width="1.5"/><path d="M22 37l-7 5 7 5z" fill="${W}"/><circle cx="101" cy="42" r="11" fill="rgba(255,255,255,.15)" stroke="${W}" stroke-width="1.5"/><path d="M98 37l7 5-7 5z" fill="${W}"/><rect x="43" y="26" width="9" height="30" rx="3" fill="rgba(0,0,0,.3)" stroke="${W}" stroke-width="1.2"/><rect x="42" y="27" width="11" height="9" rx="2.5" fill="${G}"/><rect x="66" y="40" width="12" height="16" rx="3" fill="${R}" opacity=".8"/><rect x="66" y="31" width="12" height="7" rx="2" fill="${O}" opacity=".8"/><path d="M57 50c1-6 4-9 3-14" stroke="rgba(255,255,255,.25)" stroke-width="1" fill="none"/>`,
+    };
+    return `<svg viewBox="0 0 120 64" aria-hidden="true">${phone}${parts[id]}</svg>`;
+  }
+
+  /** Touch-control options (Settings, the pause menu and the first-drive chooser). */
+  _touchFields() {
+    const t = { ...TOUCH_DEFAULTS, ...(this.app.profile.settings.touch || {}) };
+    const chip = (key, val, label) => `<div class="chip ${t[key] === val ? 'active' : ''}" data-touch="${key}" data-val="${val}">${label}</div>`;
+    const layouts = [
+      ['drag', 'Slide', 'Slide your thumb to steer · gas, brake, drift pedals'],
+      ['wheel', 'Steering wheel', 'Turn a wheel with your thumb · pedals'],
+      ['tilt', 'Tilt (gyro)', 'Turn the phone to steer · thumbs on the pedals'],
+      ['thumbs', 'Two thumbs', 'Left / right buttons · gear lever and brake'],
+    ];
+    const help = {
+      drag: 'Put your left thumb anywhere on the left side and slide it. The further you slide, the more you steer. Right thumb: hold GAS, slide onto BRAKE, or up onto DRIFT (keeps the gas on), without lifting.',
+      wheel: 'Turn the wheel with your left thumb, round its rim or anywhere on the left side. It springs back when you let go. Right thumb: hold GAS, slide onto BRAKE, or up onto DRIFT.',
+      tilt: 'Turn the phone like a steering wheel. Left thumb: BRAKE. Right thumb: hold GAS, slide up onto DRIFT.',
+      thumbs: 'Hold the left side to turn left, the right side to turn right. Push the lever up to D once and the car drives itself: you only steer. BRAKE drops the lever back to N; keep holding it at a stop to reverse. Pull the lever down to R to back up. DRIFT is the handbrake.',
+    }[t.steer];
+    const pedalLayout = t.steer !== 'thumbs';
+    return `
+      <div class="field"><label>Control layout</label>
+        <div class="layout-cards">${layouts.map(([id, name, sub]) => `<button type="button" class="layout-card ${t.steer === id ? 'active' : ''}" data-touch="steer" data-val="${id}">${this._layoutIcon(id)}<b>${name}</b><span>${sub}</span></button>`).join('')}</div>
+        <div class="meta" style="margin-top:8px">${help}</div></div>
+      ${t.steer !== 'thumbs' ? `<div class="field"><label>Steering sensitivity: <b id="tsens">${Math.round(t.sens * 100)}%</b></label><input type="range" min="0.6" max="1.6" step="0.1" value="${t.sens}" data-trange="sens"></div>` : ''}
+      ${pedalLayout ? `<div class="field"><label>Accelerator</label><div class="chips">${chip('autoGas', false, 'Hold GAS')}${chip('autoGas', true, 'Automatic')}</div>
+        ${t.autoGas ? '<div class="meta" style="margin-top:6px">The car accelerates by itself; your right thumb only brakes and drifts.</div>' : ''}</div>` : ''}
+      <div class="field"><label>Control size: <b id="tsize">${Math.round(t.size * 100)}%</b></label><input type="range" min="0.8" max="1.3" step="0.05" value="${t.size}" data-trange="size"></div>
+      <div class="field"><label>Position</label>
+        <div class="row" style="gap:8px;flex-wrap:wrap"><button type="button" class="small" data-tmove>✥ Move controls</button>${t.pos ? '<button type="button" class="small ghost" data-tposreset>Reset positions</button>' : ''}</div>
+        <div class="meta" style="margin-top:6px">${t.steer === 'thumbs' ? 'Drag the gear lever and the brake / drift buttons wherever you like.' : 'Drag the steering and the pedals wherever your thumbs rest, either side of the screen.'}</div></div>
+      ${pedalLayout ? `<div class="field"><label>Sides</label><div class="chips">${chip('swap', false, t.steer === 'tilt' ? 'Brake left · pedals right' : 'Steer left · pedals right')}${chip('swap', true, t.steer === 'tilt' ? 'Brake right · pedals left' : 'Steer right · pedals left')}</div></div>` : ''}
+      <div class="field"><label>Full screen</label><div class="chips">${chip('fullscreen', true, 'When I start driving')}${chip('fullscreen', false, 'Off')}</div>
+        ${this.app.fullscreenSupported() ? '' : '<div class="meta" style="margin-top:6px">iPhone browsers can’t go full screen from a page: tap Share → “Add to Home Screen” and start Turbo Tour from there.</div>'}</div>
+      ${navigator.vibrate ? `<div class="field"><label>Vibration</label><div class="chips">${chip('haptics', true, 'On')}${chip('haptics', false, 'Off')}</div></div>` : ''}`;
+  }
+
+  _bindTouchFields(rerender) {
+    const app = this.app, s = app.profile.settings;
+    const set = (k, v) => { s.touch = { ...TOUCH_DEFAULTS, ...(s.touch || {}), [k]: v }; app.input.setTouchPrefs(s.touch); app.save(); };
+    this.on('[data-touch]', 'click', async (e, el) => {
+      const k = el.dataset.touch, raw = el.dataset.val;
+      const v = raw === 'true' ? true : raw === 'false' ? false : raw;
+      if (k === 'steer' && v === 'tilt' && !(await requestTiltPermission())) { this.toast('Motion sensors are not available, so tilt steering is off'); return; }
+      if (k === 'fullscreen' && v === true) app.enterFullscreen();
+      set(k, v); rerender();
+    });
+    this.on('[data-tposreset]', 'click', () => { set('pos', null); rerender(); });
+    this.on('[data-tmove]', 'click', () => {
+      if (app._portraitMQ && app._portraitMQ.matches) { this.toast('Turn your phone sideways first: the controls are laid out for landscape.'); return; }
+      this.hide();
+      app.input.editLayout({
+        onChange: (p) => { s.touch = { ...TOUCH_DEFAULTS, ...(s.touch || {}), pos: p.pos, swap: p.swap }; app.save(); },
+        onDone: () => rerender(),
+      });
+    });
+    this.on('[data-trange]', 'input', (e, el) => {
+      const k = el.dataset.trange, v = parseFloat(el.value);
+      set(k, v);
+      const out = document.getElementById(k === 'sens' ? 'tsens' : 'tsize'); if (out) out.textContent = Math.round(v * 100) + '%';
+    });
+  }
+
+  /** Touch-control settings over a paused race: from the pause menu, or the first time someone
+   * drives on a touch screen (firstRun) so they pick a layout before starting. */
+  touchSettings(opts = {}) {
+    const first = !!opts.firstRun;
+    this.show(`
+      <div class="panel">
+        <div class="row between"><h2>${first ? 'Choose your controls' : 'Touch controls'}</h2>${first ? '' : '<button class="small ghost" data-back>← Back</button>'}</div>
+        ${first ? '<div class="meta" style="margin:-4px 0 10px">You can change this any time from the pause menu (❚❚).</div>' : ''}
+        ${this._touchFields()}
+        <div class="row end" style="margin-top:14px"><button class="primary" data-resume data-drive style="min-width:200px">${first ? 'Start driving' : 'Resume'}</button></div>
+      </div>`, { title: 'Touch controls' });
+    this.on('[data-back]', 'click', () => this.pause());
+    this.on('[data-resume]', 'click', () => this.app.togglePause());
+    this._bindTouchFields(() => this.touchSettings(opts));
   }
 
   /** Live gamepad readout on the settings screen; stops itself when the panel goes away. */
@@ -542,11 +635,13 @@ export class UI {
         <h2>Paused</h2>
         <div class="menu">
           <button class="primary" data-resume>Resume</button>
+          ${app.input.touchVisible ? '<button data-touchset>Touch controls <span class="hint">Layout: slide, wheel, tilt, two thumbs</span></button>' : ''}
           ${roaming ? '<button data-map>Map <span class="hint">Waypoints, fast travel, progress</span></button><button data-garage>Go to garage <span class="hint">Fast travel to Festival HQ: cars, upgrades, paint</span></button>' : '<button data-restart>Restart race</button>'}
           ${inEvent ? '<button data-quit>Back to Free Roam</button>' : roaming ? '<button data-quit-roam>Quit to menu <span class="hint">Position is saved</span></button>' : '<button data-quit>Quit to menu</button>'}
         </div>
       </div>`, { title: 'Paused' });
     this.on('[data-resume]', 'click', () => app.togglePause());
+    this.on('[data-touchset]', 'click', () => this.touchSettings());
     this.on('[data-restart]', 'click', () => app.restartRace());
     this.on('[data-map]', 'click', () => { this.horizonMap(true); });
     this.on('[data-garage]', 'click', () => app.goToGarage());

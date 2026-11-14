@@ -89,7 +89,7 @@ export class Horizon {
     this._streamChunks(true); this._cullProps(true);
     snapChaseCamera(this.camera, this.car, this.tmp2);
     this._setupAudio();
-    this.input.setTouchVisible(true);
+    this.input.setTouchVisible(true, 'roam');
   }
 
   // ------------------------------------------------------------ Setup
@@ -134,10 +134,13 @@ export class Horizon {
   /** The guide banner for the current step (null hides it). */
   guideText() {
     const g = this.prog.guide;
-    if (g === 'new') return { title: 'Welcome to Turbo Tour', text: 'This is Festival HQ, your garage. Drive onto the glowing pad by its doors and press Enter to see your cars.' };
-    if (g === 'moved') return { title: 'New: your garage is on the island', text: 'Cars, upgrades and championships now live in the world. Festival HQ is your garage: follow the purple route and press Enter on its pad.' };
+    // on a phone the prompt is tapped and the map has its own button
+    const touch = this.input.isTouchDevice;
+    const enter = touch ? 'tap the prompt' : 'press Enter';
+    if (g === 'new') return { title: 'Welcome to Turbo Tour', text: `This is Festival HQ, your garage. Drive onto the glowing pad by its doors and ${enter} to see your cars.` };
+    if (g === 'moved') return { title: 'New: your garage is on the island', text: `Cars, upgrades and championships now live in the world. Festival HQ is your garage: follow the purple route and ${enter} on its pad.` };
     if (g === 'event') return { title: 'One wallet for everything', text: 'Credits from events, championships, speed traps, drift zones and bonus boards all go to the wallet top right. Follow the route to your first event.' };
-    if (g === 'race') return { title: 'Press Enter to race', text: 'Championships are the gold trophy markers on the map (M). Higher levels unlock the bigger ones.' };
+    if (g === 'race') return { title: touch ? 'Tap the prompt to race' : 'Press Enter to race', text: `Championships are the gold trophy markers on the map (${touch ? 'MAP' : 'M'}). Higher levels unlock the bigger ones.` };
     return null;
   }
 
@@ -592,7 +595,7 @@ export class Horizon {
     this._streamChunks(true); this._cullProps(true);
     snapChaseCamera(this.camera, this.car, this.tmp2);
     this._setupAudio();
-    this.input.setTouchVisible(true);
+    this.input.setTouchVisible(true, 'roam');
     this.prompt = null; this.promptCooldown = 2;
   }
 
@@ -620,6 +623,7 @@ export class Horizon {
     const car = this.car;
     const p = this.profile;
     const ctl = getControl(p.settings.p1Control);
+    this.input.vf = car.vf;
     const r = this.input.read(ctl.scheme === 'none' ? 'wasd' : ctl.scheme, this.padIndex(), 0);
     car.input.throttle = r.throttle; car.input.brake = r.brake; car.input.steer = r.steer; car.input.handbrake = r.handbrake;
     if (r.reset) this.resetCar();

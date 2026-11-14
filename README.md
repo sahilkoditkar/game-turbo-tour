@@ -101,7 +101,8 @@ website, so it is hosted directly on GitHub Pages (or any static host).
 - Road width varies from track to track and along each lap, from tight 10 m street sections
   to 20 m+ desert straights.
   Time Trial replays your best lap as a translucent **ghost car** (stored per track and car).
-- Touch controls appear automatically on phones and tablets.
+- Touch controls appear automatically on phones and tablets, with four layouts: slide steering,
+  a steering wheel, tilt (gyro), and two thumbs with an automatic gear lever.
 - AI drivers with racing lines, braking for corners, overtaking/avoidance and un-stuck logic.
 - Per-player HUD with position, lap timer, best lap, minimap and live standings.
 - Procedural engine, skid, impact and countdown sounds (Web Audio, no asset files).
@@ -147,7 +148,26 @@ so it works from a project sub-path as well as from a custom domain.
 | Free Roam: map    | `M` / `Tab`     |                         | Back / Select      |
 | Free Roam: start event | `Enter` / `E` |                       | A                  |
 
-On touch devices, on-screen steering, gas, brake and drift buttons are shown for Player 1.
+On touch devices, on-screen controls are shown for Player 1, laid out for two thumbs on a phone held
+sideways. The first time you drive you pick one of four layouts (change it any time from the pause menu):
+
+- **Slide:** put your left thumb anywhere on the left side and slide it to steer (analog). Right thumb:
+  hold GAS, slide inward onto BRAKE or up onto DRIFT without lifting; GAS → DRIFT keeps the throttle on.
+- **Steering wheel:** turn an on-screen wheel with your left thumb; it springs back when you let go.
+  Same pedals as Slide.
+- **Tilt (gyro):** turn the phone like a steering wheel. Left thumb brakes, right thumb on GAS / DRIFT.
+- **Two thumbs:** hold the left side to turn left, the right side to turn right. Push the gear lever up
+  to **D** once and the car drives itself; you only steer. **BRAKE** drops the lever back to **N**, and
+  held at a stop it reverses; **R** backs up. A small DRIFT button is the handbrake.
+
+Reset and pause are small buttons at the top, out of the thumbs' way. Options: steering sensitivity,
+automatic accelerator, control size, left-handed sides, vibration and full screen. **Move controls**
+lets you drag the steering and pedals (or, in Two thumbs, the gear lever and brake) anywhere on the
+screen; dragging one across the middle swaps the sides.
+
+Driving is landscape only: turning the phone upright pauses the game until you turn it back. The game
+goes full screen when you start driving (Android and most tablets; there is also a ⛶ button). iPhone
+browsers can't do that from a web page: add Turbo Tour to the home screen to play it full screen.
 
 Each player picks their controls (WASD, arrows, gamepad 1, gamepad 2, or touch) on the race
 setup screen; the choice is remembered. Career uses the Player 1 choice, changeable on the
