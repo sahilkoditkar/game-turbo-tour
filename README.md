@@ -37,7 +37,7 @@ website, so it is hosted directly on GitHub Pages (or any static host).
   in Forza Horizon or GTA: shaded terrain, city blocks, road and region names, drag to pan and scroll or
   pinch to zoom, filters per marker type, and a waypoint on any marker or any point on a road. The GPS
   plans the shortest route along the roads and draws it in purple on the map and on the radar, and the
-  HUD gives turn-by-turn directions ("Turn right onto Meridian Road · 240 m"). The radar is heading-up,
+  HUD gives turn-by-turn directions ("Turn right onto Meridian Road · 240 m"). The round radar is heading-up, with the compass built into its rim (N/E/S/W and a heading readout),
   shows terrain, road classes and traffic, and zooms out with speed. Fast travel goes to any place you
   have discovered. Your position and all progress
   save in the browser. Ambient traffic drives the network in its lane, slows for corners, queues behind
@@ -91,7 +91,8 @@ website, so it is hosted directly on GitHub Pages (or any static host).
   tyres hook up again. A long handbrake pull spins the car round for a handbrake turn.
   Sliding tyres lay rubber on the road and throw up smoke (or dust off the track).
 - **Split-screen multiplayer**: two players on one keyboard (WASD vs arrow keys) or two gamepads.
-  The screen splits left/right on wide displays and top/bottom on tall ones.
+  The screen splits left/right on wide displays and top/bottom on tall ones. Computers and tablets
+  only: phones don't offer it, since each half would be too small to drive by.
 - Championships have points standings and prize money; Turbo Motors sells eleven cars (the Retro 62
   Roadster is your starter), with four upgrade lines and twelve paints, kept per car (a respray at
   Festival HQ costs 250 cr). Progress is saved in the browser (`localStorage`).

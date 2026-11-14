@@ -366,7 +366,10 @@ export class Input {
     this._els.fs.addEventListener('click', () => { if (this.onFullscreen) this.onFullscreen(); });
     el.addEventListener('contextmenu', stop);
 
-    window.addEventListener('resize', () => { if (this.touchVisible) this._layoutTouch(); });
+    window.addEventListener('resize', () => {
+      this.touchEl.style.setProperty('--s', String(this._scale()));
+      if (this.touchVisible) this._layoutTouch();
+    });
     window.addEventListener('deviceorientation', (e) => {
       if (e.beta == null || e.gamma == null) return;
       this._tilt = { beta: e.beta, gamma: e.gamma };
@@ -381,7 +384,7 @@ export class Input {
     for (const m of TOUCH_LAYOUTS) el.classList.toggle('mode-' + m, p.steer === m);
     el.classList.toggle('swap', !!p.swap);
     el.classList.toggle('autogas', !!p.autoGas);
-    el.style.setProperty('--s', String(p.size));
+    el.style.setProperty('--s', String(this._scale()));
     document.body.classList.toggle('tc-thumbs', p.steer === 'thumbs');
     this._resetTouchState();
     this._layoutTouch();
@@ -397,10 +400,17 @@ export class Input {
   /** Show whether the ⛶ button is needed (hidden once the page is full screen). */
   setFullscreenButton(show) { this._els.fs.classList.toggle('hidden', !show); }
 
+  /** Control scale: the player's size setting times a fit to the screen, so the pedals and the
+   * wheel shrink on a small phone (a 375 px-tall landscape screen) instead of covering the HUD. */
+  _scale() {
+    const fit = Math.max(0.72, Math.min(1, window.innerHeight / 420, window.innerWidth / 860));
+    return +(this.touchPrefs.size * fit).toFixed(3);
+  }
+
   /** Where the steering control rests: in the left thumb's natural reach. */
   _restPoint() {
     const r = this._els.zone.getBoundingClientRect();
-    const s = this.touchPrefs.size;
+    const s = this._scale();
     const c = this._customPos('steer');
     if (c) return { x: c[0], y: c[1], r };
     const fromEdge = Math.min(Math.max(120 * s, r.width * 0.3), r.width * 0.5);
@@ -430,7 +440,7 @@ export class Input {
   /** Put moved controls where the player left them (or back to the default layout). */
   _applyPositions() {
     const { zone, pedals, gear, mbtns } = this._els;
-    const H = window.innerHeight, s = this.touchPrefs.size;
+    const H = window.innerHeight, s = this._scale();
     const st = this._customPos('steer');
     if (st) {
       // the steering zone becomes the whole half the control sits in, from a little above it down

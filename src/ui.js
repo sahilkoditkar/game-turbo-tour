@@ -120,16 +120,21 @@ export class UI {
   // ------------------------------------------------------------ Main menu
   mainMenu() {
     this.rerender = null;
+    // Split screen needs a screen two players can share: not offered on a phone (each half would be
+    // a ~375 px strip with the HUD over the car). Tablets and computers keep it.
+    const phone = this.app.input.isTouchDevice && Math.min(screen.width, screen.height) < 500;
     this.show(`
-      <div class="panel narrow">
+      <div class="panel narrow mainmenu"><div class="mm">
+        <div class="mm-head">
         <div class="logo">TURBO <span>TOUR</span></div>
-        <div class="tagline">3D arcade racing · open world · split screen</div>
+        <div class="tagline">3D arcade racing · open world${phone ? '' : ' · split screen'}</div>
         ${this._walletBar()}
+        </div>
         <div class="menu">
           <button class="primary" data-go="horizon">Play <span class="hint" style="color:#fff;opacity:.85">Open-world career · championships, events, garage</span></button>
           <div class="menu-label">Arcade <span>· all cars unlocked, no rewards</span></div>
           <button data-go="quick">Quick Race <span class="hint">Single player vs AI</span></button>
-          <button data-go="split">Split Screen <span class="hint">2 players, one screen</span></button>
+          ${phone ? '' : `<button data-go="split">Split Screen <span class="hint">${this.app.input.isTouchDevice && !connectedPads().length ? '2 players · needs gamepads or a keyboard' : '2 players, one screen'}</span></button>`}
           <button data-go="timetrial">Time Trial <span class="hint">Beat your best laps</span></button>
           <button data-go="settings" class="ghost">Settings &amp; Controls</button>
           <button data-go="about" class="ghost">About Turbo Tour <span class="hint">Features, controls, FAQ</span></button>
@@ -140,7 +145,7 @@ export class UI {
           <div class="keys-row"><span>Any</span><kbd>Esc</kbd><span>pause</span><kbd>R</kbd><span>reset</span><span>· gamepads and touch supported</span></div>
           <a href="./showroom.html">Car showroom: see every car up close →</a>
         </div>
-      </div>`, { title: '' });
+      </div></div>`, { title: '' });
     this.on('[data-go]', 'click', (e, el) => {
       const go = el.dataset.go;
       if (go === 'horizon') this.horizonIntro();
@@ -467,6 +472,7 @@ export class UI {
         <div class="row between"><h2>Settings</h2><button class="small ghost" data-back>← Back</button></div>
         <div class="grid-2">
           <div>
+            ${app.input.isTouchDevice ? `<h3 style="margin-top:0">Touch controls</h3>${this._touchFields()}` : ''}
             <div class="field"><label>Graphics quality</label><div class="chips">
               <div class="chip ${s.quality === 'high' ? 'active' : ''}" data-q="high">High (shadows)</div>
               <div class="chip ${s.quality === 'low' ? 'active' : ''}" data-q="low">Low (fast)</div></div></div>
@@ -475,11 +481,10 @@ export class UI {
             <div class="field"><label>Volume</label><input type="range" min="0" max="1" step="0.05" value="${s.volume}" data-vol></div>
             <div class="field"><label>Player 1 controls (default)</label>${this._controlChips(s.p1Control || 'wasd', 'data-ctl="p1Control"', 0)}</div>
             <div class="field"><label>Player 2 controls (default)</label>${this._controlChips(s.p2Control || 'arrows', 'data-ctl="p2Control"', 1)}</div>
-            ${app.input.isTouchDevice ? `<h3>Touch controls</h3>${this._touchFields()}` : ''}
             <button class="small" data-fullscreen>Toggle fullscreen</button>
           </div>
           <div>
-            <h3>Controls</h3>
+            <div class="kbd-only"><h3>Controls</h3>
             <table class="controls-table">
               ${keyRow('Accelerate', ['W', '↑', 'Pad: RT / A'])}
               ${keyRow('Brake / reverse', ['S', '↓', 'Pad: LT / X'])}
@@ -487,7 +492,7 @@ export class UI {
               ${keyRow('Handbrake (drift)', ['Shift', 'Space', 'R-Shift', 'R-Ctrl', 'Pad: B / RB'])}
               ${keyRow('Reset to track', ['R', '.', 'Pad: Y'])}
               ${keyRow('Pause', ['Esc', 'Pad: Start'])}
-            </table>
+            </table></div>
             <p>Gamepad 1 drives Player 1, gamepad 2 drives Player 2. Keyboard always works too.</p>
             <h3>Controller test</h3>
             <div id="pad-diag" class="card" style="font-size:13px"></div>
@@ -633,7 +638,7 @@ export class UI {
     this.show(`
       <div class="panel narrow">
         <h2>Paused</h2>
-        <div class="menu">
+        <div class="menu pause-menu">
           <button class="primary" data-resume>Resume</button>
           ${app.input.touchVisible ? '<button data-touchset>Touch controls <span class="hint">Layout: slide, wheel, tilt, two thumbs</span></button>' : ''}
           ${roaming ? '<button data-map>Map <span class="hint">Waypoints, fast travel, progress</span></button><button data-garage>Go to garage <span class="hint">Fast travel to Festival HQ: cars, upgrades, paint</span></button>' : '<button data-restart>Restart race</button>'}
@@ -680,7 +685,7 @@ export class UI {
             }).join('')}
             <div class="meta" style="margin-top:6px">Level ${lv.level} · ${(hz.xp || 0).toLocaleString()} XP · ${(hz.discovered || []).length} places discovered · ${((hz.stats || {}).distance || 0).toFixed(1)} km driven</div>
             <div class="field" style="margin-top:10px"><label>Controls</label>${this._controlChips(p.settings.p1Control || 'wasd', 'data-ctl="1"', 0)}</div>
-            <div class="meta"><kbd>M</kbd> map · <kbd>Enter</kbd> at a marker · <kbd>R</kbd> back to the road · <kbd>Esc</kbd> pause</div>
+            <div class="meta kbd-only"><kbd>M</kbd> map · <kbd>Enter</kbd> at a marker · <kbd>R</kbd> back to the road · <kbd>Esc</kbd> pause</div>
           </div>
         </div>
         <div class="row end" style="margin-top:18px">

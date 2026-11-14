@@ -244,8 +244,8 @@ kbd { display: inline-block; line-height: 1.3; margin: 0; }
    accident. Races: either side of the minimap at the top. Free roam: in a row with MAP. */
 .tc-sys { position: absolute; top: 8px; left: calc(50% + 66px); display: flex; gap: 8px; pointer-events: auto; }
 .tc-fs { position: absolute; top: 8px; right: calc(50% + 66px); pointer-events: auto; }
-#touch-controls.roam .tc-sys { left: auto; top: 108px; right: calc(var(--edge) + 72px); }
-#touch-controls.roam .tc-fs { top: 108px; right: calc(var(--edge) + 176px); }
+#touch-controls.roam .tc-sys { left: auto; top: 46px; right: calc(var(--edge) + 72px); }
+#touch-controls.roam .tc-fs { top: 46px; right: calc(var(--edge) + 176px); }
 .tc-btn { width: 44px; height: 40px; padding: 0; justify-content: center; border-radius: 10px; font-size: 16px; background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.3); touch-action: none; }
 .tc-btn.on { background: rgba(255,255,255,.4); }
 .tc-btn:hover { transform: none; }
@@ -261,7 +261,10 @@ kbd { display: inline-block; line-height: 1.3; margin: 0; }
 #touch-controls.editing .tc-movable.grabbed { outline-style: solid; outline-color: #fff; }
 #touch-controls.editing .tc-wheel .tc-track { opacity: 1; }
 
-/* HUD while touch controls are up: nothing important under a thumb */
+/* HUD while touch controls are up: nothing important under a thumb, the middle of the screen
+   clear for the road. Corners: radar + caption + turn-by-turn top left; level and wallet in one
+   pill top right with the buttons under it; speed bottom centre between the thumbs. */
+body.touch-ui { --hud-l: max(12px, env(safe-area-inset-left, 0px)); --hud-r: max(16px, env(safe-area-inset-right, 0px)); }
 body.touch-ui .hud .bottom-right { right: auto; left: 50%; bottom: 8px; transform: translateX(-50%); text-align: center; }
 body.touch-ui .hud .speed { font-size: 40px; }
 body.touch-ui .hud .speed small { font-size: 13px; }
@@ -269,19 +272,92 @@ body.touch-ui .hud .gear-bar { width: 150px; margin: 6px auto 0; height: 6px; }
 body.touch-ui.tc-thumbs .hud .speed { font-size: 30px; }
 body.touch-ui.tc-thumbs .hud .gear-bar { width: 96px; }
 body.touch-ui .hud .minimap { bottom: auto; top: 6px; width: 110px; height: 110px; }
-body.touch-ui .hud .msg { top: 36%; }
-body.touch-ui .hud .standings { font-size: 12px; }
-body.touch-ui .hz-hint { display: none; }
-body.touch-ui .hz-mapbtn { top: 108px; height: 40px; width: 64px; padding: 0; justify-content: center; }
-body.touch-ui .hz-radar { bottom: auto; top: 84px; left: 16px; width: 128px; height: 88px; }
-body.touch-ui .hz-waypoint { bottom: auto; top: 176px; left: 16px; min-width: 0; max-width: 240px; padding: 6px 10px; }
+body.touch-ui .hud .msg { top: 30%; font-size: 26px; }
+body.touch-ui .hud .msg .sub { font-size: 13px; }
+body.touch-ui .hud .wrong { font-size: 22px; }
+/* races: compact position / lap block, standings cut to the top three and you */
+body.touch-ui .hud .top-left { top: 8px; left: var(--hud-l); gap: 2px; }
+body.touch-ui .hud .pos { font-size: 34px; }
+body.touch-ui .hud .pos .of { font-size: 13px; margin-left: 4px; }
+body.touch-ui .hud .lap { font-size: 13px; }
+body.touch-ui .hud .time { font-size: 11px; }
+body.touch-ui .hud .name { font-size: 9px; }
+body.touch-ui .hud .standings { top: 8px; right: var(--hud-r); font-size: 11px; padding: 4px 8px; }
+body.touch-ui .hud .standings div:nth-child(n+4):not(.me) { display: none; }
+/* free roam */
+body.touch-ui .hz-hint, body.touch-ui .hz-top-left { display: none; }
+body.touch-ui .hz-radarbox { bottom: auto; top: 8px; left: var(--hud-l); }
+body.touch-ui .hz-radar { width: 120px; height: 120px; }
+body.touch-ui .hz-radarcap { display: flex; align-items: baseline; gap: 6px; width: 200px; margin-top: 3px; padding: 0 4px; white-space: nowrap; overflow: hidden; text-shadow: 0 1px 4px rgba(0,0,0,.85); }
+.hz-radarcap b { flex: none; font-size: 12px; font-weight: 900; font-style: italic; }
+.hz-radarcap span { min-width: 0; font-size: 11px; color: rgba(255,255,255,.78); overflow: hidden; text-overflow: ellipsis; }
+body.touch-ui .hz-waypoint { bottom: auto; top: 154px; left: var(--hud-l); min-width: 0; max-width: 230px; padding: 5px 9px; gap: 8px; }
 body.touch-ui .hz-waypoint .turn { font-size: 22px; width: 22px; }
-body.touch-ui .hz-waypoint .instr { font-size: 13px; }
-body.touch-ui .hz-prompt { bottom: 76px; }
-body.touch-ui.tc-thumbs .hz-prompt { bottom: 180px; }
-body.touch-ui .hz-toasts { top: 150px; right: 240px; }
-/* the tutorial card sits between the radar and the button row instead of centred */
-body.touch-ui .hz-guide { left: 152px; transform: none; width: auto; right: 260px; max-width: 460px; animation: none; }
+body.touch-ui .hz-waypoint .instr { font-size: 12px; }
+body.touch-ui .hz-waypoint .info { font-size: 11px; }
+body.touch-ui .hz-top-right { top: 8px; right: var(--hud-r); display: flex; align-items: center; gap: 8px; padding: 3px 3px 3px 12px; border-radius: 999px; background: rgba(0,0,0,.4); }
+body.touch-ui .hz-level { font-size: 10px; letter-spacing: .12em; white-space: nowrap; }
+body.touch-ui .hz-level b { font-size: 15px; }
+body.touch-ui .hz-xpbar { width: 56px; height: 5px; margin: 0; }
+body.touch-ui .hz-xptext { display: none; }
+body.touch-ui .hz-wallet { border-radius: 999px; padding: 3px 10px; }
+body.touch-ui .hz-wallet span { display: none; }
+body.touch-ui .hz-money { font-size: 14px; }
+body.touch-ui .hz-mapbtn { top: 46px; right: var(--hud-r); height: 40px; width: 64px; padding: 0; justify-content: center; }
+body.touch-ui .hz-toasts { top: 94px; right: var(--hud-r); }
+body.touch-ui .hz-toast { font-size: 12px; padding: 5px 9px; }
+body.touch-ui .hz-live { top: 96px; }
+body.touch-ui .hz-live .score { font-size: 32px; }
+/* the event prompt is a button on a touch screen: above the car, wrapping instead of running under the pedals */
+body.touch-ui .hz-prompt { bottom: auto; top: 34%; transform: translate(-50%, -50%); width: max-content; max-width: max(260px, calc(100% - 300px)); white-space: normal; text-align: center; font-size: 13px; line-height: 1.35; padding: 9px 14px; animation: none; }
+body.touch-ui.tc-thumbs .hz-prompt { bottom: auto; }
+.hz-prompt kbd.tap { font-family: inherit; font-weight: 900; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; background: var(--accent); border-color: rgba(255,255,255,.35); color: #fff; }
+/* the tutorial card: in the gap between the radar and the wallet pill, below them on a narrow phone */
+body.touch-ui .hz-guide { top: 8px; left: calc(var(--hud-l) + 136px); right: calc(var(--hud-r) + 232px); width: auto; max-width: 440px; margin: 0 auto; transform: none; padding: 7px 10px; gap: 8px; animation: none; }
+body.touch-ui .hz-guide > div { font-size: 11.5px; line-height: 1.3; }
+body.touch-ui .hz-guide b { font-size: 13px; }
+@media (max-width: 700px) { body.touch-ui .hz-guide { top: 96px; left: calc(var(--hud-l) + 204px); right: var(--hud-r); } }
+/* a narrow phone has room for one card over the road: the prompt (the button) wins over the tour tip */
+@media (max-width: 700px) { body.touch-ui .has-prompt .hz-guide { display: none; } }
+/* tablets: the same thumb-safe arrangement at desktop sizes */
+@media (min-height: 600px) {
+  body.touch-ui .hz-radar { width: 200px; height: 200px; }
+  body.touch-ui .hz-radarbox { top: 16px; }
+  body.touch-ui .hz-radarcap { width: 320px; margin-top: 6px; }
+  body.touch-ui .hz-radarcap b { font-size: 20px; }
+  body.touch-ui .hz-radarcap span { font-size: 15px; }
+  body.touch-ui .hz-waypoint { top: 260px; max-width: 340px; padding: 8px 12px; }
+  body.touch-ui .hz-waypoint .turn { font-size: 30px; width: 30px; }
+  body.touch-ui .hz-waypoint .instr { font-size: 15px; }
+  body.touch-ui .hz-waypoint .info { font-size: 12px; }
+  body.touch-ui .hz-top-right { top: 16px; padding: 5px 5px 5px 16px; gap: 12px; }
+  body.touch-ui .hz-level { font-size: 13px; }
+  body.touch-ui .hz-level b { font-size: 21px; }
+  body.touch-ui .hz-xpbar { width: 110px; height: 7px; }
+  body.touch-ui .hz-money { font-size: 19px; }
+  body.touch-ui .hz-wallet { padding: 5px 14px; }
+  body.touch-ui .hz-mapbtn, body.touch-ui #touch-controls.roam .tc-sys, body.touch-ui #touch-controls.roam .tc-fs { top: 64px; }
+  body.touch-ui .hz-toasts { top: 116px; }
+  body.touch-ui .hz-toast { font-size: 14px; }
+  body.touch-ui .hud .speed { font-size: 56px; }
+  body.touch-ui .hud .speed small { font-size: 16px; }
+  body.touch-ui .hud .gear-bar { width: 200px; height: 8px; }
+  body.touch-ui .hz-prompt { font-size: 16px; padding: 11px 18px; }
+  body.touch-ui .hz-guide { left: calc(var(--hud-l) + 220px); right: calc(var(--hud-r) + 330px); top: 16px; }
+  body.touch-ui .hz-guide > div { font-size: 13px; }
+  body.touch-ui .hz-guide b { font-size: 15px; }
+  body.touch-ui .hz-live { top: 120px; }
+  body.touch-ui .hz-live .score { font-size: 44px; }
+  body.touch-ui .hud .top-left { top: 16px; gap: 4px; }
+  body.touch-ui .hud .pos { font-size: 52px; }
+  body.touch-ui .hud .pos .of { font-size: 18px; }
+  body.touch-ui .hud .lap { font-size: 18px; }
+  body.touch-ui .hud .time { font-size: 15px; }
+  body.touch-ui .hud .standings { top: 16px; font-size: 13px; }
+  body.touch-ui .hud .standings div:nth-child(n+4):not(.me) { display: flex; }
+  body.touch-ui .hud .minimap { width: 150px; height: 150px; }
+  body.touch-ui .hud .msg { font-size: 34px; }
+}
 
 /* Turn-your-phone screen: driving is landscape only */
 #rotate-overlay { position: fixed; inset: 0; z-index: 45; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; background: rgba(8,10,15,.94); color: var(--text); }
@@ -307,8 +383,8 @@ button.roam { border-color: rgba(255,210,63,.35); }
 .hz-mode { font-size: 11px; letter-spacing: .25em; text-transform: uppercase; color: rgba(255,255,255,.75); }
 .hz-region { font-size: 30px; font-weight: 900; font-style: italic; line-height: 1.1; }
 .hz-road { font-size: 14px; color: rgba(255,255,255,.8); min-height: 18px; }
-.hz-compass { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: min(440px, 60vw); height: 36px; }
-.hz-top-right { position: absolute; top: 16px; right: 16px; text-align: right; text-shadow: 0 2px 8px rgba(0,0,0,.6); }
+.hz-top-right { position: absolute; top: 16px; right: 16px; text-align: right; text-shadow: 0 2px 8px rgba(0,0,0,.6); transition: opacity .6s; }
+.hz-top-right.quiet { opacity: .4; }
 .hz-level { font-size: 14px; letter-spacing: .15em; font-weight: 800; }
 .hz-level b { font-size: 22px; color: var(--accent-2); }
 .hz-xpbar { height: 6px; width: 160px; background: rgba(0,0,0,.4); border-radius: 3px; overflow: hidden; margin: 6px 0 6px auto; }
@@ -319,19 +395,23 @@ button.roam { border-color: rgba(255,210,63,.35); }
 .hz-gain { position: absolute; right: 4px; top: 100%; margin-top: 2px; font-style: normal; font-weight: 800; font-size: 14px; color: var(--good); opacity: 0; white-space: nowrap; }
 .hz-gain.pop { animation: gainpop 1.8s ease-out; }
 @keyframes gainpop { 0% { opacity: 0; transform: translateY(-4px); } 12% { opacity: 1; transform: translateY(0); } 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(8px); } }
-.hz-guide { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); width: min(560px, calc(100% - 32px)); display: flex; gap: 12px; align-items: center; background: rgba(10,12,18,.82); border: 1px solid rgba(255,122,61,.55); border-left: 4px solid var(--accent); border-radius: 12px; padding: 10px 14px; pointer-events: auto; animation: fadein .3s; text-shadow: none; }
+.hz-guide { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); width: min(560px, calc(100% - 32px)); display: flex; gap: 12px; align-items: center; background: rgba(10,12,18,.82); border: 1px solid rgba(255,122,61,.55); border-left: 4px solid var(--accent); border-radius: 12px; padding: 10px 14px; pointer-events: auto; animation: fadein .3s; text-shadow: none; }
 .hz-guide > div { flex: 1; display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: rgba(255,255,255,.85); }
 .hz-guide b { font-size: 15px; color: #fff; }
 .hz-guide button { flex: none; font-size: 11px; padding: 5px 9px; }
 .hz-guide.hidden { display: none; }
-.hz-radar { position: absolute; bottom: 20px; left: 20px; width: 280px; height: 190px; filter: drop-shadow(0 6px 16px rgba(0,0,0,.45)); }
-.hz-waypoint { position: absolute; bottom: 222px; left: 20px; min-width: 240px; max-width: 340px; background: rgba(10,12,18,.74); border-left: 4px solid #c45bff; border-radius: 10px; padding: 8px 12px; display: flex; gap: 10px; align-items: center; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+@media (max-width: 1100px) { body:not(.touch-ui) .hz-guide { top: 120px; } }
+.hz-radarbox { position: absolute; bottom: 20px; left: 20px; }
+.hz-radar { display: block; width: 210px; height: 210px; filter: drop-shadow(0 6px 16px rgba(0,0,0,.45)); }
+/* region · road caption under the radar: phones only (on big screens it is the title top left) */
+.hz-radarcap { display: none; }
+.hz-waypoint { position: absolute; bottom: 244px; left: 20px; min-width: 240px; max-width: 340px; background: rgba(10,12,18,.74); border-left: 4px solid #c45bff; border-radius: 10px; padding: 8px 12px; display: flex; gap: 10px; align-items: center; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
 .hz-waypoint .turn { flex: none; width: 30px; font-size: 30px; font-weight: 900; line-height: 1; text-align: center; color: #e3b6ff; }
 .hz-waypoint .turn.t-back { color: var(--bad); }
 .hz-waypoint .instr { font-size: 15px; font-weight: 800; }
 .hz-waypoint .info { font-size: 12px; color: rgba(255,255,255,.75); }
 .hz-waypoint .info b { color: #fff; }
-@media (max-width: 760px) { .hz-radar { width: 200px; height: 136px; } .hz-waypoint { bottom: 166px; min-width: 0; } }
+@media (max-width: 760px) { .hz-radar { width: 170px; height: 170px; } .hz-waypoint { bottom: 204px; min-width: 0; } }
 .hz-prompt { position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.55); border: 1px solid rgba(255,179,71,.6); border-radius: 12px; padding: 10px 16px; font-size: 16px; white-space: nowrap; animation: fadein .3s; }
 .hz-live { position: absolute; top: 90px; left: 50%; transform: translateX(-50%); text-align: center; text-shadow: 0 2px 10px rgba(0,0,0,.7); }
 .hz-live .label { font-size: 12px; letter-spacing: .3em; color: var(--accent-2); font-weight: 800; }
@@ -349,7 +429,7 @@ button.roam { border-color: rgba(255,210,63,.35); }
 .hz-stats b .meta { font-weight: 400; }
 .hz-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; }
 .hz-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
-@media (max-width: 720px) { .hz-region { font-size: 22px; } .hz-radar { width: 120px; height: 120px; } .hz-waypoint { bottom: 150px; } .hz-hint { display: none; } .hz-compass { top: 60px; } }
+@media (max-width: 720px) { .hz-region { font-size: 22px; } .hz-hint { display: none; } }
 
 /* ---------- Free Roam full-screen map ---------- */
 .screen.fullbleed { padding: 0; overflow: hidden; display: block; }
@@ -489,7 +569,7 @@ body.in-garage #hud-layer { display: none; }
 .gx-dealer .gx-car.on { background: #0284c7; border-color: #0284c7; }
 .gx-dealer .gx-side { border-color: rgba(56,189,248,.25); }
 @media (max-width: 900px), (max-height: 520px) and (max-width: 1100px) {
-  .gx { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto auto; padding: 12px; }
+  .gx { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto auto; padding: 12px max(12px, env(safe-area-inset-right, 0px)) 12px max(12px, env(safe-area-inset-left, 0px)); }
   .gx-top h2 { font-size: 20px; }
   .gx-side { grid-row: 4; max-height: 38vh; margin-top: 8px; padding: 14px 16px; display: flex; flex-direction: column; }
   /* on a phone the sheet is short: the action (buy, respray, drive this one, upgrades) comes straight under the name */
@@ -517,3 +597,75 @@ body.in-garage #hud-layer { display: none; }
 .gx-respray .ghost { flex: none; justify-content: center; }
 .grid-2 .layout-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .layout-card:hover:not(:disabled) { transform: none; }
+
+/* ---------- Phones held sideways (and other short screens) ----------
+   A landscape phone is ~320-430 px tall: menus lose their roomy desktop padding, the main menu
+   and pause menu go two-column so every button fits without scrolling, and the main action of a
+   screen (Drive, Start race, Start driving) stays pinned to the bottom of its panel. */
+@media (max-height: 500px) {
+  .screen { padding: 8px max(12px, env(safe-area-inset-right, 0px)) 8px max(12px, env(safe-area-inset-left, 0px)); }
+  .panel { padding: 14px 18px; border-radius: 14px; max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px); }
+  .panel h1 { font-size: 26px; }
+  .panel h2 { font-size: 20px; margin-bottom: 8px; }
+  .panel h3 { margin: 10px 0 6px; font-size: 12px; }
+  .panel p { font-size: 13px; line-height: 1.4; margin: 6px 0; }
+  .panel .row.between > h2 { margin: 0; }
+  button { padding: 10px 14px; font-size: 15px; border-radius: 10px; }
+  button .hint { font-size: 12px; }
+  .menu { gap: 6px; }
+  .field { margin-bottom: 8px; }
+  .card { padding: 10px 12px; }
+  .card h4 { font-size: 15px; margin-bottom: 4px; }
+  .card .meta { font-size: 12px; }
+  .wallet-bar { margin: 8px 0; gap: 6px; }
+  .wallet-bar > div { padding: 5px 8px; }
+  .wallet-bar b { font-size: 15px; }
+  .tagline { margin-bottom: 10px; }
+  .stat-bar { margin: 2px 0 4px; }
+  /* the main action is always on screen */
+  .panel > .row.end:last-child { position: sticky; bottom: -14px; z-index: 2; margin: 10px -18px -14px !important; padding: 10px 18px 12px; background: linear-gradient(rgba(16,19,27,0), rgba(16,19,27,.96) 30%); }
+  /* track cards: two lines of description are enough to pick */
+  .card[data-track] .meta:first-of-type { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  /* layout chooser: the four cards in one row, smaller pictures */
+  .layout-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .layout-card { padding: 8px; gap: 4px; }
+  .layout-card svg { max-height: 54px; }
+  .layout-card span { font-size: 10px; }
+  /* pause: two columns, Resume across the top */
+  .menu.pause-menu { display: grid; grid-template-columns: 1fr 1fr; }
+  .menu.pause-menu .primary { grid-column: 1 / -1; }
+  .menu.pause-menu .hint { display: none; }
+}
+/* main menu on a landscape phone: logo and wallet on the left, the buttons on the right */
+@media (max-height: 500px) and (min-width: 560px) {
+  .panel.mainmenu { width: min(860px, 100%); }
+  .mainmenu .mm { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 0 20px; align-items: center; }
+  .mainmenu .logo { font-size: 38px; }
+  .mainmenu .tagline { letter-spacing: .15em; font-size: 10px; }
+  .mainmenu .wallet-bar { grid-template-columns: repeat(2, 1fr); }
+  .mainmenu .footer-note { margin-top: 6px; }
+  .mainmenu .menu button { padding: 8px 14px; white-space: nowrap; min-width: 0; }
+  .mainmenu .menu .hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .mainmenu .menu .primary .hint { text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 600; }
+  .mainmenu .menu-label { margin: 4px 2px 0; }
+  .mainmenu .menu { grid-column: 2; grid-row: 1 / span 2; }
+  .mainmenu .mm-head { align-self: end; }
+  .mainmenu .footer-note { align-self: start; }
+}
+/* the full-screen map on a landscape phone: the selection card on the right beside the zoom
+   buttons instead of across the middle, no help text over the map until something is picked */
+@media (max-height: 500px) {
+  .hzmap-top { padding: 8px max(14px, env(safe-area-inset-right, 0px)) 18px max(14px, env(safe-area-inset-left, 0px)); gap: 10px; }
+  .hzmap-title b { font-size: 20px; }
+  .hzmap-where, .hzmap-hints, .hzmap-progress, .hzmap-scale, .hzmap-extra { display: none; }
+  .hzmap-stats span:not(.money) { display: none; }
+  .hzmap-side { top: 52px; bottom: auto; left: auto; right: calc(max(12px, env(safe-area-inset-right, 0px)) + 52px); width: 240px; max-height: calc(100% - 110px); overflow: auto; }
+  .hzmap-card[data-sel].empty { display: none; }
+  .hzmap-legend { bottom: 10px; left: max(12px, env(safe-area-inset-left, 0px)); max-width: calc(100% - 90px); transform: none; justify-content: flex-start; }
+  .hzmap-chip { font-size: 0; padding: 4px; gap: 0; }
+  .hzmap-zoom { bottom: 10px; right: max(12px, env(safe-area-inset-right, 0px)); }
+}
+/* keyboard shortcuts mean nothing on a touch screen */
+@media (pointer: coarse) { .keys-row, .kbd-only, button kbd { display: none !important; } }
+/* the garage has its own Drive away button: no driving controls over it */
+body.in-garage #touch-controls { display: none; }
