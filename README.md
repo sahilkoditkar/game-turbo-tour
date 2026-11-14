@@ -101,7 +101,8 @@ website, so it is hosted directly on GitHub Pages (or any static host).
 - Road width varies from track to track and along each lap, from tight 10 m street sections
   to 20 m+ desert straights.
   Time Trial replays your best lap as a translucent **ghost car** (stored per track and car).
-- Touch controls appear automatically on phones and tablets.
+- Touch controls appear automatically on phones and tablets: analog slide steering, slide-between pedals,
+  optional tilt steering, auto-accelerate and a left-handed layout.
 - AI drivers with racing lines, braking for corners, overtaking/avoidance and un-stuck logic.
 - Per-player HUD with position, lap timer, best lap, minimap and live standings.
 - Procedural engine, skid, impact and countdown sounds (Web Audio, no asset files).
@@ -147,7 +148,17 @@ so it works from a project sub-path as well as from a custom domain.
 | Free Roam: map    | `M` / `Tab`     |                         | Back / Select      |
 | Free Roam: start event | `Enter` / `E` |                       | A                  |
 
-On touch devices, on-screen steering, gas, brake and drift buttons are shown for Player 1.
+On touch devices, on-screen controls are shown for Player 1, laid out for two thumbs on a phone held
+sideways:
+
+- **Steering (left thumb):** put your thumb anywhere on the left side and slide it left or right. It is
+  analog (the further you slide, the more you steer) and the control follows your thumb past full lock,
+  so reversing direction responds at once. Settings also offer a left/right rocker or tilt steering.
+- **Pedals (right thumb):** hold GAS, slide inward onto BRAKE, or up and inward onto DRIFT, without
+  lifting your thumb. Sliding from GAS onto DRIFT keeps the throttle on, which is how a drift is held.
+- **Reset and pause** are small buttons at the top, out of the thumbs' way.
+- Settings → Touch controls (also in the pause menu): steering type, sensitivity, automatic
+  accelerator, control size, a left-handed layout and vibration.
 
 Each player picks their controls (WASD, arrows, gamepad 1, gamepad 2, or touch) on the race
 setup screen; the choice is remembered. Career uses the Player 1 choice, changeable on the

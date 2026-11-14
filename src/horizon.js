@@ -89,7 +89,7 @@ export class Horizon {
     this._streamChunks(true); this._cullProps(true);
     snapChaseCamera(this.camera, this.car, this.tmp2);
     this._setupAudio();
-    this.input.setTouchVisible(true);
+    this.input.setTouchVisible(true, 'roam');
   }
 
   // ------------------------------------------------------------ Setup
@@ -592,7 +592,7 @@ export class Horizon {
     this._streamChunks(true); this._cullProps(true);
     snapChaseCamera(this.camera, this.car, this.tmp2);
     this._setupAudio();
-    this.input.setTouchVisible(true);
+    this.input.setTouchVisible(true, 'roam');
     this.prompt = null; this.promptCooldown = 2;
   }
 

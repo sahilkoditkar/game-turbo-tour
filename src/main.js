@@ -62,6 +62,7 @@ class App {
     this.profile = loadProfile();
     this.audio.setVolume(this.profile.settings.volume);
     this.audio.setEnabled(this.profile.settings.sound);
+    this.input.setTouchPrefs(this.profile.settings.touch);
     this.ui = new UI(this);
     this.race = null;
     this.horizon = null;
@@ -438,7 +439,7 @@ class App {
 
   // ------------------------------------------------------------ Profile
   save() { saveProfile(this.profile); }
-  resetProfile() { this.profile = resetProfile(); this.setup = null; this._refreshIdleCars(); }
+  resetProfile() { this.profile = resetProfile(); this.setup = null; this._refreshIdleCars(); this.input.setTouchPrefs(this.profile.settings.touch); }
   buyCar(id, paint) { const ok = buyCar(this.profile, id, paint); if (ok) this._refreshIdleCars(); return ok; }
   buyUpgrade(carId, upId) { return buyUpgrade(this.profile, carId, upId); }
   restartSeries(id) { restartSeries(this.profile, id); }

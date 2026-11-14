@@ -1,6 +1,6 @@
 import { TRACKS, getTrack } from './tracks.js';
 import { CARS, SERIES, UPGRADES, PLAYER_COLORS, PAINT_NAMES, PAINT_COST, getCar, getSeries, upgradeCost, effectiveStats } from './data.js';
-import { listControls, getControl, connectedPads, gamepadDiagnostics } from './input.js';
+import { listControls, getControl, connectedPads, gamepadDiagnostics, TOUCH_DEFAULTS, requestTiltPermission } from './input.js';
 import { seriesState, seriesLock, standings, canBuyUpgrade, paintOf, setPaint } from './career.js';
 import { levelForXp } from './worlddef.js';
 import { fmtTime } from './race.js';
@@ -475,6 +475,7 @@ export class UI {
             <div class="field"><label>Volume</label><input type="range" min="0" max="1" step="0.05" value="${s.volume}" data-vol></div>
             <div class="field"><label>Player 1 controls (default)</label>${this._controlChips(s.p1Control || 'wasd', 'data-ctl="p1Control"', 0)}</div>
             <div class="field"><label>Player 2 controls (default)</label>${this._controlChips(s.p2Control || 'arrows', 'data-ctl="p2Control"', 1)}</div>
+            ${app.input.isTouchDevice ? `<h3>Touch controls</h3>${this._touchFields()}` : ''}
             <button class="small" data-fullscreen>Toggle fullscreen</button>
           </div>
           <div>
@@ -503,7 +504,56 @@ export class UI {
     this.on('[data-vol]', 'input', (e, el) => { s.volume = parseFloat(el.value); app.audio.setVolume(s.volume); app.save(); });
     this.on('[data-ctl]', 'click', (e, el) => { s[el.dataset.ctl] = el.dataset.id; if (app.setup) { app.setup.players[0].control = s.p1Control; app.setup.players[1].control = s.p2Control; } app.save(); this.settings(); });
     this.on('[data-fullscreen]', 'click', () => app.toggleFullscreen());
+    this._bindTouchFields(() => this.settings());
     this.on('[data-reset]', 'click', () => { if (confirm('Delete all career progress, cars and best laps?')) { app.resetProfile(); this.toast('Progress reset'); this.settings(); } });
+  }
+
+  // ------------------------------------------------------------ Touch controls
+  /** Touch-control options (also used inline on the Settings screen). */
+  _touchFields() {
+    const t = { ...TOUCH_DEFAULTS, ...(this.app.profile.settings.touch || {}) };
+    const chip = (key, val, label) => `<div class="chip ${t[key] === val ? 'active' : ''}" data-touch="${key}" data-val="${val}">${label}</div>`;
+    const steerHelp = {
+      drag: 'Put your thumb anywhere on the left side and slide it left or right. The further you slide, the more you steer, and the control follows your thumb.',
+      buttons: 'A left/right rocker: slide your thumb across it to switch direction without lifting.',
+      tilt: 'Turn the phone like a steering wheel. Your left thumb brakes; the right one drives and drifts.',
+    }[t.steer];
+    return `
+      <div class="field"><label>Steering</label><div class="chips">${chip('steer', 'drag', 'Slide (analog)')}${chip('steer', 'buttons', 'Buttons')}${chip('steer', 'tilt', 'Tilt')}</div>
+        <div class="meta" style="margin-top:6px">${steerHelp}</div></div>
+      <div class="field"><label>Steering sensitivity: <b id="tsens">${Math.round(t.sens * 100)}%</b></label><input type="range" min="0.6" max="1.6" step="0.1" value="${t.sens}" data-trange="sens"></div>
+      <div class="field"><label>Accelerator</label><div class="chips">${chip('autoGas', false, 'Hold GAS')}${chip('autoGas', true, 'Automatic')}</div>
+        <div class="meta" style="margin-top:6px">${t.autoGas ? 'The car accelerates by itself; your right thumb only brakes and drifts.' : 'Hold GAS. Slide your thumb onto BRAKE, or up onto DRIFT, without lifting it. Sliding from GAS onto DRIFT keeps the throttle on.'}</div></div>
+      <div class="field"><label>Control size: <b id="tsize">${Math.round(t.size * 100)}%</b></label><input type="range" min="0.8" max="1.3" step="0.05" value="${t.size}" data-trange="size"></div>
+      <div class="field"><label>Layout</label><div class="chips">${chip('swap', false, 'Steer left · pedals right')}${chip('swap', true, 'Steer right · pedals left')}</div></div>
+      ${navigator.vibrate ? `<div class="field"><label>Vibration</label><div class="chips">${chip('haptics', true, 'On')}${chip('haptics', false, 'Off')}</div></div>` : ''}`;
+  }
+
+  _bindTouchFields(rerender) {
+    const app = this.app, s = app.profile.settings;
+    const set = (k, v) => { s.touch = { ...TOUCH_DEFAULTS, ...(s.touch || {}), [k]: v }; app.input.setTouchPrefs(s.touch); app.save(); };
+    this.on('[data-touch]', 'click', async (e, el) => {
+      const k = el.dataset.touch, raw = el.dataset.val;
+      const v = raw === 'true' ? true : raw === 'false' ? false : raw;
+      if (k === 'steer' && v === 'tilt' && !(await requestTiltPermission())) { this.toast('Motion sensors are not available, so tilt steering is off'); return; }
+      set(k, v); rerender();
+    });
+    this.on('[data-trange]', 'input', (e, el) => {
+      const k = el.dataset.trange, v = parseFloat(el.value);
+      set(k, v);
+      const out = document.getElementById(k === 'sens' ? 'tsens' : 'tsize'); if (out) out.textContent = Math.round(v * 100) + '%';
+    });
+  }
+
+  /** Touch-control settings from the pause menu, so they can be tuned mid-race. */
+  touchSettings() {
+    this.show(`
+      <div class="panel narrow">
+        <div class="row between"><h2>Touch controls</h2><button class="small ghost" data-back>← Back</button></div>
+        ${this._touchFields()}
+      </div>`, { title: 'Touch controls' });
+    this.on('[data-back]', 'click', () => this.pause());
+    this._bindTouchFields(() => this.touchSettings());
   }
 
   /** Live gamepad readout on the settings screen; stops itself when the panel goes away. */
@@ -542,11 +592,13 @@ export class UI {
         <h2>Paused</h2>
         <div class="menu">
           <button class="primary" data-resume>Resume</button>
+          ${app.input.touchVisible ? '<button data-touchset>Touch controls <span class="hint">Steering, layout, size</span></button>' : ''}
           ${roaming ? '<button data-map>Map <span class="hint">Waypoints, fast travel, progress</span></button><button data-garage>Go to garage <span class="hint">Fast travel to Festival HQ: cars, upgrades, paint</span></button>' : '<button data-restart>Restart race</button>'}
           ${inEvent ? '<button data-quit>Back to Free Roam</button>' : roaming ? '<button data-quit-roam>Quit to menu <span class="hint">Position is saved</span></button>' : '<button data-quit>Quit to menu</button>'}
         </div>
       </div>`, { title: 'Paused' });
     this.on('[data-resume]', 'click', () => app.togglePause());
+    this.on('[data-touchset]', 'click', () => this.touchSettings());
     this.on('[data-restart]', 'click', () => app.restartRace());
     this.on('[data-map]', 'click', () => { this.horizonMap(true); });
     this.on('[data-garage]', 'click', () => app.goToGarage());
