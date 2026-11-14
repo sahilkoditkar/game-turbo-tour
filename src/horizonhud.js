@@ -24,7 +24,7 @@ export class HorizonHUD {
     this.layer.classList.remove('hidden');
     this.other.classList.add('hidden');
     this.divider.className = 'hidden';
-    this.el.className = 'hud';
+    this.el.className = 'hud hz';
     this.el.classList.remove('hidden');
     this.el.innerHTML = `
       <div class="hz-top-left">
@@ -160,6 +160,7 @@ export class HorizonHUD {
       if (q.prompt.innerHTML !== html) q.prompt.innerHTML = html;
     } else q.prompt.classList.add('hidden');
     this.el.classList.toggle('has-prompt', !!hz.prompt);
+    this.el.classList.toggle('has-zone', !!this.live || q.msg.classList.contains('show'));
 
     // Live zone score
     if (this.live) { q.live.classList.remove('hidden'); q.liveLabel.textContent = this.live.label; q.liveScore.textContent = this.live.value; }
@@ -181,10 +182,11 @@ export class HorizonHUD {
     // zoom out with speed so there is time to read the junction coming up
     this.radarSpan = (this.radarSpan || RADAR_NEAR) + ((RADAR_NEAR + (RADAR_FAR - RADAR_NEAR) * Math.min(1, car.speed / 55)) - (this.radarSpan || RADAR_NEAR)) * 0.04;
     const sc = ch / this.radarSpan;
-    // round radar: the car sits a little below the middle so more of the road ahead shows
+    // round radar: the car sits well below the middle, so about twice as much road shows ahead
+    // as behind (1.38 R ahead, 0.62 R behind)
     const R = Math.min(cw, ch) / 2 - 1;
     this._ring = { ox: cw / 2, oy: ch / 2, R };
-    const cx = cw / 2, cy = ch / 2 + R * 0.18;
+    const cx = cw / 2, cy = ch / 2 + R * 0.38;
     const th = car.heading + Math.PI, cos = Math.cos(th), sin = Math.sin(th);
     const toR = (x, z) => { const dx = x - car.pos.x, dz = z - car.pos.z; return { x: cx + (dx * cos - dz * sin) * sc, y: cy + (dx * sin + dz * cos) * sc }; };
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
