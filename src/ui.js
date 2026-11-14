@@ -120,18 +120,21 @@ export class UI {
   // ------------------------------------------------------------ Main menu
   mainMenu() {
     this.rerender = null;
+    // Split screen needs a screen two players can share: not offered on a phone (each half would be
+    // a ~375 px strip with the HUD over the car). Tablets and computers keep it.
+    const phone = this.app.input.isTouchDevice && Math.min(screen.width, screen.height) < 500;
     this.show(`
       <div class="panel narrow mainmenu"><div class="mm">
         <div class="mm-head">
         <div class="logo">TURBO <span>TOUR</span></div>
-        <div class="tagline">3D arcade racing · open world · split screen</div>
+        <div class="tagline">3D arcade racing · open world${phone ? '' : ' · split screen'}</div>
         ${this._walletBar()}
         </div>
         <div class="menu">
           <button class="primary" data-go="horizon">Play <span class="hint" style="color:#fff;opacity:.85">Open-world career · championships, events, garage</span></button>
           <div class="menu-label">Arcade <span>· all cars unlocked, no rewards</span></div>
           <button data-go="quick">Quick Race <span class="hint">Single player vs AI</span></button>
-          <button data-go="split">Split Screen <span class="hint">${this.app.input.isTouchDevice && !connectedPads().length ? '2 players · needs gamepads or a keyboard' : '2 players, one screen'}</span></button>
+          ${phone ? '' : `<button data-go="split">Split Screen <span class="hint">${this.app.input.isTouchDevice && !connectedPads().length ? '2 players · needs gamepads or a keyboard' : '2 players, one screen'}</span></button>`}
           <button data-go="timetrial">Time Trial <span class="hint">Beat your best laps</span></button>
           <button data-go="settings" class="ghost">Settings &amp; Controls</button>
           <button data-go="about" class="ghost">About Turbo Tour <span class="hint">Features, controls, FAQ</span></button>

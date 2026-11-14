@@ -91,7 +91,8 @@ website, so it is hosted directly on GitHub Pages (or any static host).
   tyres hook up again. A long handbrake pull spins the car round for a handbrake turn.
   Sliding tyres lay rubber on the road and throw up smoke (or dust off the track).
 - **Split-screen multiplayer**: two players on one keyboard (WASD vs arrow keys) or two gamepads.
-  The screen splits left/right on wide displays and top/bottom on tall ones.
+  The screen splits left/right on wide displays and top/bottom on tall ones. Computers and tablets
+  only: phones don't offer it, since each half would be too small to drive by.
 - Championships have points standings and prize money; Turbo Motors sells eleven cars (the Retro 62
   Roadster is your starter), with four upgrade lines and twelve paints, kept per car (a respray at
   Festival HQ costs 250 cr). Progress is saved in the browser (`localStorage`).
