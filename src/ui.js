@@ -548,6 +548,9 @@ export class UI {
       ${pedalLayout ? `<div class="field"><label>Accelerator</label><div class="chips">${chip('autoGas', false, 'Hold GAS')}${chip('autoGas', true, 'Automatic')}</div>
         ${t.autoGas ? '<div class="meta" style="margin-top:6px">The car accelerates by itself; your right thumb only brakes and drifts.</div>' : ''}</div>` : ''}
       <div class="field"><label>Control size: <b id="tsize">${Math.round(t.size * 100)}%</b></label><input type="range" min="0.8" max="1.3" step="0.05" value="${t.size}" data-trange="size"></div>
+      <div class="field"><label>Position</label>
+        <div class="row" style="gap:8px;flex-wrap:wrap"><button type="button" class="small" data-tmove>✥ Move controls</button>${t.pos ? '<button type="button" class="small ghost" data-tposreset>Reset positions</button>' : ''}</div>
+        <div class="meta" style="margin-top:6px">${t.steer === 'thumbs' ? 'Drag the gear lever and the brake / drift buttons wherever you like.' : 'Drag the steering and the pedals wherever your thumbs rest, either side of the screen.'}</div></div>
       ${pedalLayout ? `<div class="field"><label>Sides</label><div class="chips">${chip('swap', false, t.steer === 'tilt' ? 'Brake left · pedals right' : 'Steer left · pedals right')}${chip('swap', true, t.steer === 'tilt' ? 'Brake right · pedals left' : 'Steer right · pedals left')}</div></div>` : ''}
       <div class="field"><label>Full screen</label><div class="chips">${chip('fullscreen', true, 'When I start driving')}${chip('fullscreen', false, 'Off')}</div>
         ${this.app.fullscreenSupported() ? '' : '<div class="meta" style="margin-top:6px">iPhone browsers can’t go full screen from a page: tap Share → “Add to Home Screen” and start Turbo Tour from there.</div>'}</div>
@@ -563,6 +566,15 @@ export class UI {
       if (k === 'steer' && v === 'tilt' && !(await requestTiltPermission())) { this.toast('Motion sensors are not available, so tilt steering is off'); return; }
       if (k === 'fullscreen' && v === true) app.enterFullscreen();
       set(k, v); rerender();
+    });
+    this.on('[data-tposreset]', 'click', () => { set('pos', null); rerender(); });
+    this.on('[data-tmove]', 'click', () => {
+      if (app._portraitMQ && app._portraitMQ.matches) { this.toast('Turn your phone sideways first: the controls are laid out for landscape.'); return; }
+      this.hide();
+      app.input.editLayout({
+        onChange: (p) => { s.touch = { ...TOUCH_DEFAULTS, ...(s.touch || {}), pos: p.pos, swap: p.swap }; app.save(); },
+        onDone: () => rerender(),
+      });
     });
     this.on('[data-trange]', 'input', (e, el) => {
       const k = el.dataset.trange, v = parseFloat(el.value);

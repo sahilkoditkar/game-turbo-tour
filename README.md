@@ -161,7 +161,9 @@ sideways. The first time you drive you pick one of four layouts (change it any t
   held at a stop it reverses; **R** backs up. A small DRIFT button is the handbrake.
 
 Reset and pause are small buttons at the top, out of the thumbs' way. Options: steering sensitivity,
-automatic accelerator, control size, left-handed sides, vibration and full screen.
+automatic accelerator, control size, left-handed sides, vibration and full screen. **Move controls**
+lets you drag the steering and pedals (or, in Two thumbs, the gear lever and brake) anywhere on the
+screen; dragging one across the middle swaps the sides.
 
 Driving is landscape only: turning the phone upright pauses the game until you turn it back. The game
 goes full screen when you start driving (Android and most tablets; there is also a ⛶ button). iPhone

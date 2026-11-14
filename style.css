@@ -250,6 +250,17 @@ kbd { display: inline-block; line-height: 1.3; margin: 0; }
 .tc-btn.on { background: rgba(255,255,255,.4); }
 .tc-btn:hover { transform: none; }
 
+/* "Move controls": drag the controls to where you like them */
+#touch-controls.editing { background: rgba(6,8,12,.55); z-index: 42; }
+#touch-controls.editing .tc-sys, #touch-controls.editing .tc-fs { display: none; }
+.tc-edit { position: absolute; inset: 0; pointer-events: auto; touch-action: none; }
+.tc-editbar { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px); display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--panel-border); font-size: 13px; font-weight: 600; }
+.tc-editbar span { color: var(--text); line-height: 1.25; }
+.tc-editbar button { min-height: 40px; padding: 0 16px; }
+#touch-controls.editing .tc-movable { outline: 2px dashed rgba(255,210,63,.9); outline-offset: 6px; border-radius: 18px; }
+#touch-controls.editing .tc-movable.grabbed { outline-style: solid; outline-color: #fff; }
+#touch-controls.editing .tc-wheel .tc-track { opacity: 1; }
+
 /* HUD while touch controls are up: nothing important under a thumb */
 body.touch-ui .hud .bottom-right { right: auto; left: 50%; bottom: 8px; transform: translateX(-50%); text-align: center; }
 body.touch-ui .hud .speed { font-size: 40px; }

@@ -15,8 +15,13 @@ export const TOUCH_DEFAULTS = {
   haptics: true,   // short vibrations on brake / drift / gear (Android)
   fullscreen: true, // go full screen when you start driving
   chosen: false,   // the layout chooser has been shown once
+  pos: null,       // where the player dragged the controls: { steer, pedals, gear, mbtns } -> [x, y] centre as
+                   // fractions of the screen. steer / pedals are stored as if not swapped and mirrored when swapped.
 };
 export const TOUCH_LAYOUTS = ['drag', 'wheel', 'tilt', 'thumbs'];
+
+const STEER_ZONE_TOP = 150;          // px: a moved steering zone never reaches up into the top buttons / MAP
+const PEDALS_W = 194, PEDALS_H = 172; // the pedal block, before scaling (see .tc-pedals in style.css)
 
 /** Fixed control options. Gamepads are added dynamically from `connectedPads()`. */
 const BASE_CONTROLS = [
@@ -224,7 +229,7 @@ export class Input {
     this._els = {
       zone, pedals, wheel: q('.tc-wheel'), knob: q('.tc-knob'), sw: q('.tc-sw'), swSvg: q('.tc-sw svg'),
       tiltbrake: q('.tc-tiltbrake'), pedalEls: [...pedals.querySelectorAll('[data-p]')],
-      gear: q('.tc-gear'), gknob: q('.tc-gknob'), turns: [...el.querySelectorAll('.tc-turn')], mid: [...el.querySelectorAll('[data-m]')], fs: q('.tc-fs'),
+      gear: q('.tc-gear'), gknob: q('.tc-gknob'), mbtns: q('.tc-mbtns'), turns: [...el.querySelectorAll('.tc-turn')], mid: [...el.querySelectorAll('[data-m]')], fs: q('.tc-fs'),
     };
     const stop = (e) => { if (e.cancelable) e.preventDefault(); };
     const capture = (target, e) => { try { target.setPointerCapture(e.pointerId); } catch (err) { /* pointer already gone */ } };
@@ -396,6 +401,8 @@ export class Input {
   _restPoint() {
     const r = this._els.zone.getBoundingClientRect();
     const s = this.touchPrefs.size;
+    const c = this._customPos('steer');
+    if (c) return { x: c[0], y: c[1], r };
     const fromEdge = Math.min(Math.max(120 * s, r.width * 0.3), r.width * 0.5);
     const x = this.touchPrefs.swap ? r.right - fromEdge : r.left + fromEdge;
     const y = r.bottom - Math.min((this.touchPrefs.steer === 'wheel' ? 90 : 78) * s, r.height * 0.4);
@@ -412,8 +419,137 @@ export class Input {
     wheel.style.top = (y - r.top) + 'px';
   }
 
+  /** A control's centre on screen (px) if the player moved it, else null. */
+  _customPos(key) {
+    const p = this.touchPrefs.pos && this.touchPrefs.pos[key];
+    if (!Array.isArray(p)) return null;
+    const mirror = this.touchPrefs.swap && (key === 'steer' || key === 'pedals');
+    return [(mirror ? 1 - p[0] : p[0]) * window.innerWidth, p[1] * window.innerHeight];
+  }
+
+  /** Put moved controls where the player left them (or back to the default layout). */
+  _applyPositions() {
+    const { zone, pedals, gear, mbtns } = this._els;
+    const H = window.innerHeight, s = this.touchPrefs.size;
+    const st = this._customPos('steer');
+    if (st) {
+      // the steering zone becomes the whole half the control sits in, from a little above it down
+      const top = Math.max(STEER_ZONE_TOP, Math.min(H * 0.4, st[1] - 110 * s));
+      zone.style.width = '50%'; zone.style.height = (H - top) + 'px';
+    } else { zone.style.width = ''; zone.style.height = ''; }
+    const place = (e, c, w, h) => {
+      if (!c) { for (const k of ['left', 'top', 'right', 'bottom', 'transformOrigin']) e.style[k] = ''; return; }
+      Object.assign(e.style, { left: (c[0] - w / 2) + 'px', top: (c[1] - h / 2) + 'px', right: 'auto', bottom: 'auto' });
+    };
+    place(pedals, this._customPos('pedals'), PEDALS_W, PEDALS_H);
+    if (this._customPos('pedals')) pedals.style.transformOrigin = '50% 50%';
+    for (const [k, e] of [['gear', gear], ['mbtns', mbtns]]) {
+      const c = this._customPos(k);
+      if (!c) { place(e, null); e.style.transform = ''; continue; }
+      Object.assign(e.style, { left: c[0] + 'px', top: c[1] + 'px', right: 'auto', bottom: 'auto', transform: 'translate(-50%, -50%)' });
+    }
+  }
+
+  /** The controls that can be moved in the current layout, and their elements. */
+  _movables() {
+    const e = this._els, m = this.touchPrefs.steer;
+    if (m === 'thumbs') return [['gear', e.gear], ['mbtns', e.mbtns]];
+    return [['steer', { drag: e.wheel, wheel: e.sw, tilt: e.tiltbrake }[m]], ['pedals', e.pedals]];
+  }
+
+  get editing() { return !!this._edit; }
+
+  /** "Move controls": the controls appear over the screen and the player drags them where they
+   * like. Dragging the steering or the pedals over the middle swaps the sides.
+   * onChange(prefs) is called after each move so the app can save; onDone() when they finish. */
+  editLayout({ onChange, onDone } = {}) {
+    if (this._edit || !this._els) return;
+    const el = this.touchEl;
+    const ed = this._edit = { wasHidden: el.classList.contains('hidden'), drag: null };
+    el.classList.remove('hidden');
+    el.classList.add('editing');
+    this._resetTouchState();
+    this._layoutTouch();
+    this._applyTouch();
+    const layer = ed.layer = document.createElement('div');
+    layer.className = 'tc-edit';
+    layer.innerHTML = `<div class="tc-editbar"><span>Drag the controls where your thumbs rest. Drag across the middle to switch sides.</span>
+      <button type="button" class="small" data-e="reset">Reset</button><button type="button" class="small primary" data-e="done">Done</button></div>`;
+    el.appendChild(layer);
+    const mark = () => {
+      for (const e of el.querySelectorAll('.tc-movable')) e.classList.remove('tc-movable');
+      for (const [, e] of this._movables()) e.classList.add('tc-movable');
+    };
+    mark();
+    const changed = () => { if (onChange) onChange(this.touchPrefs); };
+    layer.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.tc-editbar')) return;
+      if (e.cancelable) e.preventDefault();
+      if (ed.drag) return;
+      const pad = 24;
+      for (const [k, item] of this._movables()) {
+        const r = item.getBoundingClientRect();
+        if (e.clientX < r.left - pad || e.clientX > r.right + pad || e.clientY < r.top - pad || e.clientY > r.bottom + pad) continue;
+        ed.drag = { id: e.pointerId, k, item, ox: e.clientX - (r.left + r.width / 2), oy: e.clientY - (r.top + r.height / 2), w: r.width, h: r.height };
+        try { layer.setPointerCapture(e.pointerId); } catch (err) { /* gone */ }
+        item.classList.add('grabbed');
+        this._buzz(8);
+        break;
+      }
+    });
+    layer.addEventListener('pointermove', (e) => {
+      const d = ed.drag;
+      if (d && d.id === e.pointerId) this._moveControl(d, e.clientX - d.ox, e.clientY - d.oy);
+    });
+    const end = (e) => {
+      const d = ed.drag;
+      if (!d || d.id !== e.pointerId) return;
+      d.item.classList.remove('grabbed');
+      ed.drag = null;
+      changed();
+    };
+    for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) layer.addEventListener(ev, end);
+    layer.querySelector('[data-e=reset]').addEventListener('click', () => {
+      const pos = { ...(this.touchPrefs.pos || {}) };
+      for (const [k] of this._movables()) delete pos[k];
+      this.touchPrefs.pos = Object.keys(pos).length ? pos : null;
+      this._layoutTouch();
+      changed();
+    });
+    layer.querySelector('[data-e=done]').addEventListener('click', () => {
+      layer.remove();
+      for (const e of el.querySelectorAll('.tc-movable')) e.classList.remove('tc-movable', 'grabbed');
+      el.classList.remove('editing');
+      if (ed.wasHidden && !this.touchVisible) el.classList.add('hidden');
+      this._edit = null;
+      this._layoutTouch();
+      if (onDone) onDone();
+    });
+  }
+
+  _moveControl(d, cx, cy) {
+    const W = window.innerWidth, H = window.innerHeight, p = this.touchPrefs, m = 8;
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const sided = d.k === 'steer' || d.k === 'pedals';
+    let swap = p.swap;
+    if (d.k === 'steer') swap = cx > W / 2;
+    else if (d.k === 'pedals') swap = cx < W / 2;
+    const onRight = d.k === 'steer' ? swap : d.k === 'pedals' ? !swap : null;
+    // keep it on screen, below the editor bar, and (steering / pedals) on its own half
+    cx = clamp(cx, d.w / 2 + m, W - d.w / 2 - m);
+    if (onRight === true) cx = Math.max(cx, W / 2);
+    if (onRight === false) cx = Math.min(cx, W / 2);
+    const minY = d.k === 'steer' ? Math.max(H * 0.4, STEER_ZONE_TOP + 40) : 64 + d.h / 2;
+    cy = clamp(cy, Math.min(minY, H - d.h / 2 - m), H - d.h / 2 - m);
+    const fx = sided && swap ? 1 - cx / W : cx / W;
+    p.pos = { ...(p.pos || {}), [d.k]: [+fx.toFixed(4), +(cy / H).toFixed(4)] };
+    if (swap !== p.swap) { p.swap = swap; this.touchEl.classList.toggle('swap', swap); }
+    this._layoutTouch();
+  }
+
   _layoutTouch() {
     if (!this._els) return;
+    this._applyPositions();
     const { wheel, knob, sw, swSvg, tiltbrake, zone } = this._els;
     wheel.style.setProperty('--range', this._steerRange() + 'px');
     knob.style.transform = 'translate(-50%, -50%)';

@@ -205,7 +205,7 @@ class App {
       this._touchGuard();
       let pauseKey = this.input.justPressed('Escape') || this.input.touch.pause;
       for (const pd of connectedPads()) if (this.input.read('none', pd.index, -1).pause) pauseKey = true;
-      if (pauseKey && !(this.race && this.race.state === 'finished')) {
+      if (pauseKey && !this.input.editing && !(this.race && this.race.state === 'finished')) {
         if (this.ui.mapOpen) this.closeMap();
         else if (this.ui.worldPanelClose) this.ui.worldPanelClose();   // garage / championship screen over the world
         else this.togglePause();
