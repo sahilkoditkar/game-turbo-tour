@@ -4,12 +4,24 @@
 // forest costs a handful of draw calls. Flat shading gives every facet a clean
 // light or dark tone.
 import * as THREE from 'three';
+import { srgbByte, SRGB_TO_LINEAR_GLSL } from './surface.js';
 
 const shared = (o) => { o.userData.shared = true; return o; };
-let MAT = null;
+let MAT = null, PACKED = null;
 function material() {
   if (!MAT) MAT = shared(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95, metalness: 0 }));
   return MAT;
+}
+/** The same material for vegetationMesh's packed vertices: colours arrive as sRGB bytes and are decoded to linear. */
+function packedMaterial() {
+  if (!PACKED) {
+    PACKED = shared(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95, metalness: 0 }));
+    PACKED.onBeforeCompile = (sh) => {
+      sh.vertexShader = SRGB_TO_LINEAR_GLSL + sh.vertexShader.replace('#include <color_vertex>', '#include <color_vertex>\n  vColor.rgb = srgbToLinear(vColor.rgb);');
+    };
+    PACKED.customProgramCacheKey = () => 'plants-packed';
+  }
+  return PACKED;
 }
 
 /** Deterministic hash of a position to [0, 1). */
@@ -276,7 +288,9 @@ export function vegetationMesh(parts, highQ) {
   if (!items.length) return null;
   let n = 0;
   for (const [g] of items) n += g.attributes.position.count;
-  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3);
+  // normals and colours packed into bytes (4 each, not 12): plants are flat-shaded, so their
+  // normals barely matter, and 8-bit sRGB is the precision colour images have anyway
+  const pos = new Float32Array(n * 3), nor = new Int8Array(n * 4), col = new Uint8Array(n * 4);
   const m = new THREE.Matrix4(), nm = new THREE.Matrix3(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc3 = new THREE.Vector3();
   const up = new THREE.Vector3(0, 1, 0);
   let o = 0;
@@ -289,16 +303,16 @@ export function vegetationMesh(parts, highQ) {
     const P = g.attributes.position, N = g.attributes.normal, C = g.attributes.color;
     for (let i = 0; i < P.count; i++, o++) {
       v.fromBufferAttribute(P, i).applyMatrix4(m); pos[o * 3] = v.x; pos[o * 3 + 1] = v.y; pos[o * 3 + 2] = v.z;
-      v.fromBufferAttribute(N, i).applyMatrix3(nm).normalize(); nor[o * 3] = v.x; nor[o * 3 + 1] = v.y; nor[o * 3 + 2] = v.z;
-      col[o * 3] = C.getX(i) * l; col[o * 3 + 1] = C.getY(i) * l; col[o * 3 + 2] = C.getZ(i) * lb;
+      v.fromBufferAttribute(N, i).applyMatrix3(nm).normalize(); nor[o * 4] = Math.round(v.x * 127); nor[o * 4 + 1] = Math.round(v.y * 127); nor[o * 4 + 2] = Math.round(v.z * 127);
+      col[o * 4] = srgbByte(C.getX(i) * l); col[o * 4 + 1] = srgbByte(C.getY(i) * l); col[o * 4 + 2] = srgbByte(C.getZ(i) * lb); col[o * 4 + 3] = 255;
     }
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(nor, 4, true));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 4, true));
   geo.computeBoundingSphere();
-  const mesh = new THREE.Mesh(geo, material());
+  const mesh = new THREE.Mesh(geo, packedMaterial());
   mesh.castShadow = highQ;
   return mesh;
 }

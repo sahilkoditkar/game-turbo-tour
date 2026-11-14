@@ -2,6 +2,7 @@
 // details, built from the primitives in carkit.js. Templates are built once per shape and
 // cloned per car, with paint, livery colours, brake lights and race numbers swapped per car.
 import * as THREE from 'three';
+import { readSurface } from './surface.js';
 import { Kit, detail, sharedMaterials, rect, quad, ellipse, roundRect, ellipsePts } from './carkit.js';
 
 const MODELS = {};
@@ -1079,7 +1080,7 @@ function liteGeometry(shape) {
     if (mat.emissive && mat.emissiveIntensity > 0.5) col.copy(mat.emissive).multiplyScalar(Math.min(1.4, mat.emissiveIntensity * 0.6));   // lamps read bright
     if (role === 'plate') col.set(0xeeeeee);
     // folded parts (surface.js) carry their colour and glow per vertex
-    const surf = mat.userData.surface ? { C: g.attributes.color, E: g.attributes.aEmis } : null;
+    const surf = !!mat.userData.surface;
     parts.push({ g, m: new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld), col, surf, roleId: { paint: 1, accent: 2, accent2: 3 }[role] || 0 });
   });
   let nv = 0, ni = 0;
@@ -1087,7 +1088,7 @@ function liteGeometry(shape) {
   const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), colA = new Float32Array(nv * 3), roleA = new Float32Array(nv), idx = new Uint32Array(ni);
   const v = new THREE.Vector3(), nm = new THREE.Matrix3();
   let vo = 0, io = 0;
-  const vc = new THREE.Color();
+  const vc = new THREE.Color(), ve = new THREE.Color();
   for (const { g, m, col, surf, roleId } of parts) {
     if (!g.attributes.normal) g.computeVertexNormals();
     nm.getNormalMatrix(m);
@@ -1097,9 +1098,9 @@ function liteGeometry(shape) {
       v.fromBufferAttribute(N, i).applyMatrix3(nm).normalize(); nor.set([v.x, v.y, v.z], (vo + i) * 3);
       if (surf) {
         // the same rule as for a whole material: a lamp (bright glow) reads as its glow colour
-        const er = surf.E.getX(i), eg = surf.E.getY(i), eb = surf.E.getZ(i), ei = Math.max(er, eg, eb);
-        if (ei > 0.5) vc.setRGB(er, eg, eb).multiplyScalar(Math.min(1.4, ei * 0.6) / ei);
-        else vc.setRGB(surf.C.getX(i), surf.C.getY(i), surf.C.getZ(i));
+        readSurface(g, i, vc, ve);
+        const ei = Math.max(ve.r, ve.g, ve.b);
+        if (ei > 0.5) vc.copy(ve).multiplyScalar(Math.min(1.4, ei * 0.6) / ei);
         colA.set([vc.r, vc.g, vc.b], (vo + i) * 3);
       } else colA.set([col.r, col.g, col.b], (vo + i) * 3);
       roleA[vo + i] = roleId;
