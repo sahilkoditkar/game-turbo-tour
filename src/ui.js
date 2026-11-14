@@ -131,7 +131,7 @@ export class UI {
           <button class="primary" data-go="horizon">Play <span class="hint" style="color:#fff;opacity:.85">Open-world career · championships, events, garage</span></button>
           <div class="menu-label">Arcade <span>· all cars unlocked, no rewards</span></div>
           <button data-go="quick">Quick Race <span class="hint">Single player vs AI</span></button>
-          <button data-go="split">Split Screen <span class="hint">2 players, one screen</span></button>
+          <button data-go="split">Split Screen <span class="hint">${this.app.input.isTouchDevice && !connectedPads().length ? '2 players · needs gamepads or a keyboard' : '2 players, one screen'}</span></button>
           <button data-go="timetrial">Time Trial <span class="hint">Beat your best laps</span></button>
           <button data-go="settings" class="ghost">Settings &amp; Controls</button>
           <button data-go="about" class="ghost">About Turbo Tour <span class="hint">Features, controls, FAQ</span></button>
@@ -469,6 +469,7 @@ export class UI {
         <div class="row between"><h2>Settings</h2><button class="small ghost" data-back>← Back</button></div>
         <div class="grid-2">
           <div>
+            ${app.input.isTouchDevice ? `<h3 style="margin-top:0">Touch controls</h3>${this._touchFields()}` : ''}
             <div class="field"><label>Graphics quality</label><div class="chips">
               <div class="chip ${s.quality === 'high' ? 'active' : ''}" data-q="high">High (shadows)</div>
               <div class="chip ${s.quality === 'low' ? 'active' : ''}" data-q="low">Low (fast)</div></div></div>
@@ -477,11 +478,10 @@ export class UI {
             <div class="field"><label>Volume</label><input type="range" min="0" max="1" step="0.05" value="${s.volume}" data-vol></div>
             <div class="field"><label>Player 1 controls (default)</label>${this._controlChips(s.p1Control || 'wasd', 'data-ctl="p1Control"', 0)}</div>
             <div class="field"><label>Player 2 controls (default)</label>${this._controlChips(s.p2Control || 'arrows', 'data-ctl="p2Control"', 1)}</div>
-            ${app.input.isTouchDevice ? `<h3>Touch controls</h3>${this._touchFields()}` : ''}
             <button class="small" data-fullscreen>Toggle fullscreen</button>
           </div>
           <div>
-            <h3>Controls</h3>
+            <div class="kbd-only"><h3>Controls</h3>
             <table class="controls-table">
               ${keyRow('Accelerate', ['W', '↑', 'Pad: RT / A'])}
               ${keyRow('Brake / reverse', ['S', '↓', 'Pad: LT / X'])}
@@ -489,7 +489,7 @@ export class UI {
               ${keyRow('Handbrake (drift)', ['Shift', 'Space', 'R-Shift', 'R-Ctrl', 'Pad: B / RB'])}
               ${keyRow('Reset to track', ['R', '.', 'Pad: Y'])}
               ${keyRow('Pause', ['Esc', 'Pad: Start'])}
-            </table>
+            </table></div>
             <p>Gamepad 1 drives Player 1, gamepad 2 drives Player 2. Keyboard always works too.</p>
             <h3>Controller test</h3>
             <div id="pad-diag" class="card" style="font-size:13px"></div>

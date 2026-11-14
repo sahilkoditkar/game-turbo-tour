@@ -287,11 +287,11 @@ body.touch-ui .hud .standings div:nth-child(n+4):not(.me) { display: none; }
 /* free roam */
 body.touch-ui .hz-hint, body.touch-ui .hz-top-left { display: none; }
 body.touch-ui .hz-radarbox { bottom: auto; top: 8px; left: var(--hud-l); }
-body.touch-ui .hz-radar { width: 168px; height: 108px; }
-body.touch-ui .hz-radarcap { display: flex; align-items: baseline; gap: 6px; width: 168px; margin-top: 3px; padding: 0 4px; white-space: nowrap; overflow: hidden; text-shadow: 0 1px 4px rgba(0,0,0,.85); }
+body.touch-ui .hz-radar { width: 120px; height: 120px; }
+body.touch-ui .hz-radarcap { display: flex; align-items: baseline; gap: 6px; width: 200px; margin-top: 3px; padding: 0 4px; white-space: nowrap; overflow: hidden; text-shadow: 0 1px 4px rgba(0,0,0,.85); }
 .hz-radarcap b { flex: none; font-size: 12px; font-weight: 900; font-style: italic; }
 .hz-radarcap span { min-width: 0; font-size: 11px; color: rgba(255,255,255,.78); overflow: hidden; text-overflow: ellipsis; }
-body.touch-ui .hz-waypoint { bottom: auto; top: 140px; left: var(--hud-l); min-width: 0; max-width: 230px; padding: 5px 9px; gap: 8px; }
+body.touch-ui .hz-waypoint { bottom: auto; top: 154px; left: var(--hud-l); min-width: 0; max-width: 230px; padding: 5px 9px; gap: 8px; }
 body.touch-ui .hz-waypoint .turn { font-size: 22px; width: 22px; }
 body.touch-ui .hz-waypoint .instr { font-size: 12px; }
 body.touch-ui .hz-waypoint .info { font-size: 11px; }
@@ -309,14 +309,55 @@ body.touch-ui .hz-toast { font-size: 12px; padding: 5px 9px; }
 body.touch-ui .hz-live { top: 96px; }
 body.touch-ui .hz-live .score { font-size: 32px; }
 /* the event prompt is a button on a touch screen: above the car, wrapping instead of running under the pedals */
-body.touch-ui .hz-prompt { bottom: auto; top: 34%; transform: translate(-50%, -50%); width: max-content; max-width: max(220px, calc(100% - 420px)); white-space: normal; text-align: center; font-size: 13px; line-height: 1.35; padding: 9px 14px; animation: none; }
+body.touch-ui .hz-prompt { bottom: auto; top: 34%; transform: translate(-50%, -50%); width: max-content; max-width: max(260px, calc(100% - 300px)); white-space: normal; text-align: center; font-size: 13px; line-height: 1.35; padding: 9px 14px; animation: none; }
 body.touch-ui.tc-thumbs .hz-prompt { bottom: auto; }
 .hz-prompt kbd.tap { font-family: inherit; font-weight: 900; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; background: var(--accent); border-color: rgba(255,255,255,.35); color: #fff; }
-/* the tutorial card: top centre between the radar and the wallet, below them on a narrow phone */
-body.touch-ui .hz-guide { top: 8px; width: calc(100% - 420px); max-width: 440px; padding: 7px 10px; gap: 8px; animation: none; }
+/* the tutorial card: in the gap between the radar and the wallet pill, below them on a narrow phone */
+body.touch-ui .hz-guide { top: 8px; left: calc(var(--hud-l) + 136px); right: calc(var(--hud-r) + 232px); width: auto; max-width: 440px; margin: 0 auto; transform: none; padding: 7px 10px; gap: 8px; animation: none; }
 body.touch-ui .hz-guide > div { font-size: 11.5px; line-height: 1.3; }
 body.touch-ui .hz-guide b { font-size: 13px; }
-@media (max-width: 700px) { body.touch-ui .hz-guide { top: 96px; left: 196px; right: var(--hud-r); width: auto; transform: none; } }
+@media (max-width: 700px) { body.touch-ui .hz-guide { top: 96px; left: calc(var(--hud-l) + 204px); right: var(--hud-r); } }
+/* a narrow phone has room for one card over the road: the prompt (the button) wins over the tour tip */
+@media (max-width: 700px) { body.touch-ui .has-prompt .hz-guide { display: none; } }
+/* tablets: the same thumb-safe arrangement at desktop sizes */
+@media (min-height: 600px) {
+  body.touch-ui .hz-radar { width: 200px; height: 200px; }
+  body.touch-ui .hz-radarbox { top: 16px; }
+  body.touch-ui .hz-radarcap { width: 320px; margin-top: 6px; }
+  body.touch-ui .hz-radarcap b { font-size: 20px; }
+  body.touch-ui .hz-radarcap span { font-size: 15px; }
+  body.touch-ui .hz-waypoint { top: 260px; max-width: 340px; padding: 8px 12px; }
+  body.touch-ui .hz-waypoint .turn { font-size: 30px; width: 30px; }
+  body.touch-ui .hz-waypoint .instr { font-size: 15px; }
+  body.touch-ui .hz-waypoint .info { font-size: 12px; }
+  body.touch-ui .hz-top-right { top: 16px; padding: 5px 5px 5px 16px; gap: 12px; }
+  body.touch-ui .hz-level { font-size: 13px; }
+  body.touch-ui .hz-level b { font-size: 21px; }
+  body.touch-ui .hz-xpbar { width: 110px; height: 7px; }
+  body.touch-ui .hz-money { font-size: 19px; }
+  body.touch-ui .hz-wallet { padding: 5px 14px; }
+  body.touch-ui .hz-mapbtn, body.touch-ui #touch-controls.roam .tc-sys, body.touch-ui #touch-controls.roam .tc-fs { top: 64px; }
+  body.touch-ui .hz-toasts { top: 116px; }
+  body.touch-ui .hz-toast { font-size: 14px; }
+  body.touch-ui .hud .speed { font-size: 56px; }
+  body.touch-ui .hud .speed small { font-size: 16px; }
+  body.touch-ui .hud .gear-bar { width: 200px; height: 8px; }
+  body.touch-ui .hz-prompt { font-size: 16px; padding: 11px 18px; }
+  body.touch-ui .hz-guide { left: calc(var(--hud-l) + 220px); right: calc(var(--hud-r) + 330px); top: 16px; }
+  body.touch-ui .hz-guide > div { font-size: 13px; }
+  body.touch-ui .hz-guide b { font-size: 15px; }
+  body.touch-ui .hz-live { top: 120px; }
+  body.touch-ui .hz-live .score { font-size: 44px; }
+  body.touch-ui .hud .top-left { top: 16px; gap: 4px; }
+  body.touch-ui .hud .pos { font-size: 52px; }
+  body.touch-ui .hud .pos .of { font-size: 18px; }
+  body.touch-ui .hud .lap { font-size: 18px; }
+  body.touch-ui .hud .time { font-size: 15px; }
+  body.touch-ui .hud .standings { top: 16px; font-size: 13px; }
+  body.touch-ui .hud .standings div:nth-child(n+4):not(.me) { display: flex; }
+  body.touch-ui .hud .minimap { width: 150px; height: 150px; }
+  body.touch-ui .hud .msg { font-size: 34px; }
+}
 
 /* Turn-your-phone screen: driving is landscape only */
 #rotate-overlay { position: fixed; inset: 0; z-index: 45; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; background: rgba(8,10,15,.94); color: var(--text); }
@@ -342,7 +383,8 @@ button.roam { border-color: rgba(255,210,63,.35); }
 .hz-mode { font-size: 11px; letter-spacing: .25em; text-transform: uppercase; color: rgba(255,255,255,.75); }
 .hz-region { font-size: 30px; font-weight: 900; font-style: italic; line-height: 1.1; }
 .hz-road { font-size: 14px; color: rgba(255,255,255,.8); min-height: 18px; }
-.hz-top-right { position: absolute; top: 16px; right: 16px; text-align: right; text-shadow: 0 2px 8px rgba(0,0,0,.6); }
+.hz-top-right { position: absolute; top: 16px; right: 16px; text-align: right; text-shadow: 0 2px 8px rgba(0,0,0,.6); transition: opacity .6s; }
+.hz-top-right.quiet { opacity: .4; }
 .hz-level { font-size: 14px; letter-spacing: .15em; font-weight: 800; }
 .hz-level b { font-size: 22px; color: var(--accent-2); }
 .hz-xpbar { height: 6px; width: 160px; background: rgba(0,0,0,.4); border-radius: 3px; overflow: hidden; margin: 6px 0 6px auto; }
@@ -360,16 +402,16 @@ button.roam { border-color: rgba(255,210,63,.35); }
 .hz-guide.hidden { display: none; }
 @media (max-width: 1100px) { body:not(.touch-ui) .hz-guide { top: 120px; } }
 .hz-radarbox { position: absolute; bottom: 20px; left: 20px; }
-.hz-radar { display: block; width: 280px; height: 190px; filter: drop-shadow(0 6px 16px rgba(0,0,0,.45)); }
+.hz-radar { display: block; width: 210px; height: 210px; filter: drop-shadow(0 6px 16px rgba(0,0,0,.45)); }
 /* region · road caption under the radar: phones only (on big screens it is the title top left) */
 .hz-radarcap { display: none; }
-.hz-waypoint { position: absolute; bottom: 222px; left: 20px; min-width: 240px; max-width: 340px; background: rgba(10,12,18,.74); border-left: 4px solid #c45bff; border-radius: 10px; padding: 8px 12px; display: flex; gap: 10px; align-items: center; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+.hz-waypoint { position: absolute; bottom: 244px; left: 20px; min-width: 240px; max-width: 340px; background: rgba(10,12,18,.74); border-left: 4px solid #c45bff; border-radius: 10px; padding: 8px 12px; display: flex; gap: 10px; align-items: center; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
 .hz-waypoint .turn { flex: none; width: 30px; font-size: 30px; font-weight: 900; line-height: 1; text-align: center; color: #e3b6ff; }
 .hz-waypoint .turn.t-back { color: var(--bad); }
 .hz-waypoint .instr { font-size: 15px; font-weight: 800; }
 .hz-waypoint .info { font-size: 12px; color: rgba(255,255,255,.75); }
 .hz-waypoint .info b { color: #fff; }
-@media (max-width: 760px) { .hz-radar { width: 200px; height: 136px; } .hz-waypoint { bottom: 166px; min-width: 0; } }
+@media (max-width: 760px) { .hz-radar { width: 170px; height: 170px; } .hz-waypoint { bottom: 204px; min-width: 0; } }
 .hz-prompt { position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.55); border: 1px solid rgba(255,179,71,.6); border-radius: 12px; padding: 10px 16px; font-size: 16px; white-space: nowrap; animation: fadein .3s; }
 .hz-live { position: absolute; top: 90px; left: 50%; transform: translateX(-50%); text-align: center; text-shadow: 0 2px 10px rgba(0,0,0,.7); }
 .hz-live .label { font-size: 12px; letter-spacing: .3em; color: var(--accent-2); font-weight: 800; }
@@ -602,7 +644,9 @@ body.in-garage #hud-layer { display: none; }
   .mainmenu .tagline { letter-spacing: .15em; font-size: 10px; }
   .mainmenu .wallet-bar { grid-template-columns: repeat(2, 1fr); }
   .mainmenu .footer-note { margin-top: 6px; }
-  .mainmenu .menu button { padding: 9px 14px; }
+  .mainmenu .menu button { padding: 8px 14px; white-space: nowrap; min-width: 0; }
+  .mainmenu .menu .hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .mainmenu .menu .primary .hint { text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 600; }
   .mainmenu .menu-label { margin: 4px 2px 0; }
   .mainmenu .menu { grid-column: 2; grid-row: 1 / span 2; }
   .mainmenu .mm-head { align-self: end; }
@@ -622,4 +666,6 @@ body.in-garage #hud-layer { display: none; }
   .hzmap-zoom { bottom: 10px; right: max(12px, env(safe-area-inset-right, 0px)); }
 }
 /* keyboard shortcuts mean nothing on a touch screen */
-@media (pointer: coarse) { .keys-row, .kbd-only { display: none !important; } }
+@media (pointer: coarse) { .keys-row, .kbd-only, button kbd { display: none !important; } }
+/* the garage has its own Drive away button: no driving controls over it */
+body.in-garage #touch-controls { display: none; }

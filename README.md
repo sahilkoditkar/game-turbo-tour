@@ -37,7 +37,7 @@ website, so it is hosted directly on GitHub Pages (or any static host).
   in Forza Horizon or GTA: shaded terrain, city blocks, road and region names, drag to pan and scroll or
   pinch to zoom, filters per marker type, and a waypoint on any marker or any point on a road. The GPS
   plans the shortest route along the roads and draws it in purple on the map and on the radar, and the
-  HUD gives turn-by-turn directions ("Turn right onto Meridian Road · 240 m"). The radar is heading-up,
+  HUD gives turn-by-turn directions ("Turn right onto Meridian Road · 240 m"). The round radar is heading-up, with the compass built into its rim (N/E/S/W and a heading readout),
   shows terrain, road classes and traffic, and zooms out with speed. Fast travel goes to any place you
   have discovered. Your position and all progress
   save in the browser. Ambient traffic drives the network in its lane, slows for corners, queues behind

@@ -468,7 +468,8 @@ export class WorldMap {
           c.style.cursor = 'grabbing';
         }
       }
-      this.mouse = { x: e.offsetX, y: e.offsetY };
+      // hover tooltips follow a mouse; a finger has nothing to hover with (a tap selects instead)
+      this.mouse = e.pointerType === 'mouse' ? { x: e.offsetX, y: e.offsetY } : null;
       this._updateHover();
     });
     const up = (e) => {
