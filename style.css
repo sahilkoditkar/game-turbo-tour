@@ -165,23 +165,35 @@ kbd { display: inline-block; line-height: 1.3; margin: 0; }
 #touch-controls { position: fixed; inset: 0; z-index: 15; pointer-events: none; --s: 1; --edge: max(16px, env(safe-area-inset-right, 0px)); --edge-l: max(16px, env(safe-area-inset-left, 0px)); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; color: #fff; }
 #touch-controls b, #touch-controls small { pointer-events: none; }
 
-/* steering: a big zone for the left thumb (right thumb when swapped) */
+/* which parts each layout uses */
+.tc-wheel, .tc-sw, .tc-tiltbrake, .tc-turn, .tc-gear, .tc-mbtns { display: none; }
+.mode-drag .tc-wheel, .mode-wheel .tc-sw, .mode-tilt .tc-tiltbrake { display: flex; }
+.mode-thumbs .tc-steer, .mode-thumbs .tc-pedals { display: none; }
+.mode-thumbs .tc-turn, .mode-thumbs .tc-gear, .mode-thumbs .tc-mbtns { display: flex; }
+
+/* steering zone for the left thumb (right thumb when swapped) */
 .tc-steer { position: absolute; left: 0; bottom: 0; width: 42%; height: 60%; pointer-events: auto; touch-action: none; }
 #touch-controls.swap .tc-steer { left: auto; right: 0; }
-.tc-wheel, .tc-rocker, .tc-tiltbrake { position: absolute; transform: translate(-50%, -50%); display: none; }
-.mode-drag .tc-wheel, .mode-buttons .tc-rocker, .mode-tilt .tc-tiltbrake { display: flex; }
-.tc-wheel { flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
+.tc-wheel, .tc-sw, .tc-tiltbrake { position: absolute; transform: translate(-50%, -50%); pointer-events: none; }
+/* slide */
+.tc-wheel { flex-direction: column; align-items: center; gap: 6px; }
 .tc-track { position: relative; width: calc(var(--range) * 2 + 64px * var(--s)); height: calc(64px * var(--s)); border-radius: 999px; background: rgba(0,0,0,.28); border: 2px solid rgba(255,255,255,.28); display: flex; align-items: center; justify-content: space-between; padding: 0 14px; box-sizing: border-box; font-size: calc(16px * var(--s)); color: rgba(255,255,255,.55); backdrop-filter: blur(3px); transition: opacity .2s; }
 .tc-knob { position: absolute; left: 50%; top: 50%; width: calc(58px * var(--s)); height: calc(58px * var(--s)); border-radius: 50%; background: rgba(255,255,255,.3); border: 2px solid rgba(255,255,255,.75); transform: translate(-50%, -50%); box-shadow: 0 4px 14px rgba(0,0,0,.35); }
 .tc-label { font-size: 10px; font-weight: 800; letter-spacing: .2em; text-transform: uppercase; color: rgba(255,255,255,.6); text-shadow: 0 1px 4px rgba(0,0,0,.7); }
 .tc-wheel:not(.active) .tc-track { opacity: .6; }
 .tc-wheel.active .tc-label { visibility: hidden; }
 .tc-wheel.active .tc-knob { background: rgba(255,255,255,.55); }
-.tc-rocker { width: calc(200px * var(--s)); height: calc(92px * var(--s)); border-radius: 999px; overflow: hidden; background: rgba(0,0,0,.32); border: 2px solid rgba(255,255,255,.35); backdrop-filter: blur(4px); pointer-events: none; }
-.tc-rocker span { flex: 1; display: flex; align-items: center; justify-content: center; font-size: calc(28px * var(--s)); }
-.tc-rocker span + span { border-left: 1px solid rgba(255,255,255,.25); }
-.tc-rocker span.on { background: rgba(255,255,255,.35); }
-.tc-tiltbrake { width: calc(124px * var(--s)); height: calc(124px * var(--s)); border-radius: 26px; flex-direction: column; align-items: center; justify-content: center; gap: 4px; background: rgba(255,72,72,.22); border: 2px solid rgba(255,90,90,.65); backdrop-filter: blur(4px); pointer-events: none; }
+/* steering wheel */
+.tc-sw { width: calc(150px * var(--s)); height: calc(150px * var(--s)); }
+.tc-sw svg { width: 100%; height: 100%; transition: transform .25s ease-out; filter: drop-shadow(0 4px 10px rgba(0,0,0,.45)); }
+.tc-sw.active svg { transition: none; }
+.tc-sw .rim { fill: rgba(0,0,0,.18); stroke: rgba(255,255,255,.7); stroke-width: 9; }
+.tc-sw .spokes line { stroke: rgba(255,255,255,.55); stroke-width: 7; stroke-linecap: round; }
+.tc-sw .hub { fill: rgba(30,32,40,.85); stroke: rgba(255,255,255,.6); stroke-width: 2; }
+.tc-sw .mark { fill: var(--accent); }
+.tc-sw.active .rim { stroke: #fff; }
+/* tilt: the left thumb brakes */
+.tc-tiltbrake { width: calc(124px * var(--s)); height: calc(124px * var(--s)); border-radius: 26px; flex-direction: column; align-items: center; justify-content: center; gap: 4px; background: rgba(255,72,72,.22); border: 2px solid rgba(255,90,90,.65); backdrop-filter: blur(4px); }
 .tc-tiltbrake b { font-size: calc(17px * var(--s)); font-weight: 900; letter-spacing: .06em; }
 .tc-tiltbrake small { font-size: 9px; font-weight: 700; text-align: center; color: rgba(255,255,255,.7); padding: 0 8px; }
 .tc-tiltbrake.on { background: rgba(255,72,72,.55); }
@@ -192,7 +204,6 @@ kbd { display: inline-block; line-height: 1.3; margin: 0; }
 #touch-controls.swap .tc-pedals { right: auto; left: var(--edge-l); transform-origin: 0 100%; }
 .tc-pedal { position: absolute; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border-radius: 20px; border: 2px solid rgba(255,255,255,.35); background: rgba(0,0,0,.32); backdrop-filter: blur(4px); transition: background .08s, transform .08s; }
 .tc-pedal b { font-size: 17px; font-weight: 900; letter-spacing: .06em; }
-.tc-pedal small { font-size: 8.5px; font-weight: 700; letter-spacing: .04em; color: rgba(255,255,255,.65); text-align: center; line-height: 1.25; padding: 0 4px; }
 .tc-pedal.gas { right: 0; width: 96px; height: 150px; background: rgba(61,220,132,.24); border-color: rgba(61,220,132,.75); }
 .tc-pedal.brake { right: 106px; width: 88px; height: 104px; background: rgba(255,72,72,.2); border-color: rgba(255,90,90,.7); }
 .tc-pedal.drift { right: 106px; bottom: 114px; height: 58px; width: 88px; border-radius: 16px; background: rgba(255,90,31,.24); border-color: rgba(255,122,61,.75); }
@@ -209,23 +220,43 @@ kbd { display: inline-block; line-height: 1.3; margin: 0; }
 #touch-controls.swap.autogas .tc-pedal.brake { right: auto; left: 0; }
 #touch-controls.swap.autogas .tc-pedal.drift { right: auto; left: 106px; }
 
-/* reset / pause: small and out of the thumbs' reach so they are never hit by accident.
-   Races: next to the minimap at the top. Free roam: in a row with the MAP button. */
+/* two thumbs: left half turns left, right half turns right; gear lever and brake in the
+   middle, either side of the car so it stays in view */
+.tc-turn { position: absolute; bottom: 0; width: calc(50% - 140px); height: 66%; pointer-events: auto; touch-action: none; }
+.tc-turn.left { left: 0; }
+.tc-turn.right { right: 0; }
+.tc-pad { position: absolute; bottom: calc(20px * var(--s)); width: calc(104px * var(--s)); height: calc(104px * var(--s)); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: calc(38px * var(--s)); background: rgba(0,0,0,.3); border: 2px solid rgba(255,255,255,.4); backdrop-filter: blur(4px); color: rgba(255,255,255,.9); pointer-events: none; transition: background .08s, transform .08s; }
+.tc-turn.left .tc-pad { left: max(var(--edge-l), 7%); }
+.tc-turn.right .tc-pad { right: max(var(--edge), 7%); }
+.tc-turn.on .tc-pad { background: rgba(255,255,255,.4); transform: scale(.95); }
+.tc-gear { position: absolute; bottom: 14px; right: calc(50% + 62px); width: calc(58px * var(--s)); height: calc(150px * var(--s)); flex-direction: column; justify-content: space-around; align-items: center; border-radius: 16px; background: rgba(0,0,0,.4); border: 2px solid rgba(255,255,255,.3); backdrop-filter: blur(4px); pointer-events: auto; touch-action: none; }
+.tc-gear span { font-size: 12px; font-weight: 900; color: rgba(255,255,255,.45); pointer-events: none; }
+.tc-gknob { position: absolute; left: 50%; top: 50%; width: calc(48px * var(--s)); height: calc(44px * var(--s)); transform: translate(-50%, -50%); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-style: normal; font-weight: 900; font-size: calc(20px * var(--s)); background: #3a3f4c; border: 2px solid rgba(255,255,255,.7); box-shadow: 0 4px 12px rgba(0,0,0,.45); pointer-events: none; transition: top .12s ease-out, background .12s; }
+.tc-gear.active .tc-gknob { transition: background .12s; }
+.tc-gear[data-gear="D"] .tc-gknob { background: #1f9d5c; }
+.tc-gear[data-gear="R"] .tc-gknob { background: #c83a3a; }
+.tc-mbtns { position: absolute; bottom: 14px; left: calc(50% + 62px); flex-direction: column; gap: 10px; }
+.tc-mbtns .tc-pedal { position: relative; pointer-events: auto; touch-action: none; right: auto; bottom: auto; width: calc(80px * var(--s)); }
+.tc-mbtns .tc-pedal.brake { height: calc(92px * var(--s)); }
+.tc-mbtns .tc-pedal.drift { height: calc(48px * var(--s)); }
+
+/* reset / pause / full screen: small and out of the thumbs' reach so they are never hit by
+   accident. Races: either side of the minimap at the top. Free roam: in a row with MAP. */
 .tc-sys { position: absolute; top: 8px; left: calc(50% + 66px); display: flex; gap: 8px; pointer-events: auto; }
+.tc-fs { position: absolute; top: 8px; right: calc(50% + 66px); pointer-events: auto; }
 #touch-controls.roam .tc-sys { left: auto; top: 108px; right: calc(var(--edge) + 72px); }
+#touch-controls.roam .tc-fs { top: 108px; right: calc(var(--edge) + 176px); }
 .tc-btn { width: 44px; height: 40px; padding: 0; justify-content: center; border-radius: 10px; font-size: 16px; background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.3); touch-action: none; }
 .tc-btn.on { background: rgba(255,255,255,.4); }
 .tc-btn:hover { transform: none; }
-.tc-rotate { display: none; }
-@media (orientation: portrait) {
-  .tc-rotate { display: block; position: absolute; top: 40%; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.65); border-radius: 12px; padding: 10px 16px; font-weight: 800; font-size: 14px; white-space: nowrap; }
-}
 
 /* HUD while touch controls are up: nothing important under a thumb */
 body.touch-ui .hud .bottom-right { right: auto; left: 50%; bottom: 8px; transform: translateX(-50%); text-align: center; }
 body.touch-ui .hud .speed { font-size: 40px; }
 body.touch-ui .hud .speed small { font-size: 13px; }
 body.touch-ui .hud .gear-bar { width: 150px; margin: 6px auto 0; height: 6px; }
+body.touch-ui.tc-thumbs .hud .speed { font-size: 30px; }
+body.touch-ui.tc-thumbs .hud .gear-bar { width: 96px; }
 body.touch-ui .hud .minimap { bottom: auto; top: 6px; width: 110px; height: 110px; }
 body.touch-ui .hud .msg { top: 36%; }
 body.touch-ui .hud .standings { font-size: 12px; }
@@ -236,8 +267,28 @@ body.touch-ui .hz-waypoint { bottom: auto; top: 176px; left: 16px; min-width: 0;
 body.touch-ui .hz-waypoint .turn { font-size: 22px; width: 22px; }
 body.touch-ui .hz-waypoint .instr { font-size: 13px; }
 body.touch-ui .hz-prompt { bottom: 76px; }
+body.touch-ui.tc-thumbs .hz-prompt { bottom: 180px; }
 body.touch-ui .hz-toasts { top: 150px; right: 240px; }
-body.touch-ui .hz-guide { width: min(460px, calc(100% - 390px)); }
+/* the tutorial card sits between the radar and the button row instead of centred */
+body.touch-ui .hz-guide { left: 152px; transform: none; width: auto; right: 260px; max-width: 460px; animation: none; }
+
+/* Turn-your-phone screen: driving is landscape only */
+#rotate-overlay { position: fixed; inset: 0; z-index: 45; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; background: rgba(8,10,15,.94); color: var(--text); }
+body.need-landscape #rotate-overlay { display: flex; }
+#rotate-overlay .phone { width: 46px; height: 78px; border: 4px solid #fff; border-radius: 10px; position: relative; animation: turnphone 2.2s ease-in-out infinite; }
+#rotate-overlay .phone::after { content: ''; position: absolute; left: 50%; bottom: 5px; width: 12px; height: 3px; margin-left: -6px; border-radius: 2px; background: #fff; }
+#rotate-overlay h2 { margin: 6px 0 0; font-size: 24px; }
+#rotate-overlay p { margin: 0; color: var(--muted); max-width: 320px; font-size: 15px; }
+@keyframes turnphone { 0%, 20% { transform: rotate(0); } 50%, 80% { transform: rotate(-90deg); } 100% { transform: rotate(0); } }
+
+/* Layout chooser (Settings, pause menu, first drive on a touch screen) */
+.layout-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 560px) { .layout-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.layout-card { display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 10px; border-radius: 12px; text-align: left; }
+.layout-card svg { width: 100%; height: auto; display: block; }
+.layout-card b { font-size: 14px; }
+.layout-card span { font-size: 11px; color: var(--muted); font-weight: 600; line-height: 1.3; }
+.layout-card.active { border-color: var(--accent); background: rgba(255,90,31,.14); box-shadow: 0 0 0 1px var(--accent) inset; }
 
 /* ---------- Free Roam ---------- */
 button.roam { border-color: rgba(255,210,63,.35); }
@@ -453,3 +504,5 @@ body.in-garage #hud-layer { display: none; }
 .gx-respray { display: flex; gap: 8px; margin-top: 12px; }
 .gx-respray .primary { flex: 1; }
 .gx-respray .ghost { flex: none; justify-content: center; }
+.grid-2 .layout-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.layout-card:hover:not(:disabled) { transform: none; }

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Input, getControl, connectedPads } from './input.js';
+import { Input, getControl, connectedPads, TOUCH_DEFAULTS } from './input.js';
 import { AudioSystem } from './audio.js';
 import { UI } from './ui.js';
 import { Race } from './race.js';
@@ -63,6 +63,7 @@ class App {
     this.audio.setVolume(this.profile.settings.volume);
     this.audio.setEnabled(this.profile.settings.sound);
     this.input.setTouchPrefs(this.profile.settings.touch);
+    this._initTouchScreen();
     this.ui = new UI(this);
     this.race = null;
     this.horizon = null;
@@ -139,9 +140,69 @@ class App {
     if (this.horizon) this.horizon.resize();
   }
 
+  // ------------------------------------------------------------ Phones: landscape + full screen
+  _initTouchScreen() {
+    this._portraitMQ = matchMedia('(orientation: portrait)');
+    this._appMQ = matchMedia('(display-mode: fullscreen), (display-mode: standalone)');
+    const ov = document.createElement('div');
+    ov.id = 'rotate-overlay';
+    ov.innerHTML = '<div class="phone" aria-hidden="true"></div><h2>Turn your phone sideways</h2><p>Turbo Tour is played in landscape. The game is paused until you turn your phone.</p>';
+    document.body.appendChild(ov);
+    this.input.onFullscreen = () => this.fullscreenTap();
+    const sync = () => this.input.setFullscreenButton(!this.isFullscreen());
+    document.addEventListener('fullscreenchange', sync);
+    document.addEventListener('webkitfullscreenchange', sync);
+    sync();
+    // Starting to drive from a tap goes full screen (the browser only allows it during a tap).
+    document.addEventListener('click', (e) => {
+      if (!this.input.isTouchDevice || !this.input.touchPrefs.fullscreen) return;
+      if (e.target.closest && e.target.closest('[data-start],[data-fresh],[data-resume],[data-drive]')) this.enterFullscreen();
+    }, true);
+  }
+
+  fullscreenSupported() { const d = document.documentElement; return !!(d.requestFullscreen || d.webkitRequestFullscreen); }
+  isFullscreen() { return !!(document.fullscreenElement || document.webkitFullscreenElement) || this._appMQ.matches || navigator.standalone === true; }
+
+  enterFullscreen() {
+    if (this.isFullscreen() || !this.fullscreenSupported()) return;
+    const d = document.documentElement;
+    const lock = () => { try { const p = screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape'); if (p && p.catch) p.catch(() => {}); } catch (e) { /* not supported */ } };
+    try {
+      const p = d.requestFullscreen ? d.requestFullscreen({ navigationUI: 'hide' }) : d.webkitRequestFullscreen();
+      if (p && p.then) p.then(lock, () => {}); else lock();
+    } catch (e) { /* refused */ }
+  }
+
+  /** The ⛶ button: full screen where the browser allows it, otherwise how to get it (iPhone). */
+  fullscreenTap() {
+    if (this.fullscreenSupported()) this.enterFullscreen();
+    else this.ui.toast('For full screen on iPhone: tap Share, then “Add to Home Screen”, and open Turbo Tour from your home screen.', 7000);
+  }
+
+  /** While driving on a phone: portrait pauses the game behind a "turn your phone" screen, and the
+   * first drive on a touch screen asks which control layout to use. */
+  _touchGuard() {
+    const raceDone = this.race && this.race.state === 'finished';
+    const busy = raceDone || this.ui.mapOpen || this.ui.worldPanelClose;
+    const need = this.input.isTouchDevice && !!(this.race || this.horizon) && this._portraitMQ.matches;
+    if (need !== this._needLandscape) {
+      this._needLandscape = need;
+      document.body.classList.toggle('need-landscape', need);
+    }
+    if (need) { if (!this.paused && !busy) this.togglePause(); return; }
+    if (this.input.touchVisible && !this.paused && !busy && !this.input.touchPrefs.chosen) {
+      const t = this.profile.settings.touch = { ...TOUCH_DEFAULTS, ...(this.profile.settings.touch || {}), chosen: true };
+      this.input.setTouchPrefs(t);
+      this.save();
+      this.togglePause();
+      this.ui.touchSettings({ firstRun: true });
+    }
+  }
+
   frame() {
     const dt = Math.min(this.clock.getDelta(), 0.1);
     if (this.race || this.horizon) {
+      this._touchGuard();
       let pauseKey = this.input.justPressed('Escape') || this.input.touch.pause;
       for (const pd of connectedPads()) if (this.input.read('none', pd.index, -1).pause) pauseKey = true;
       if (pauseKey && !(this.race && this.race.state === 'finished')) {
@@ -445,8 +506,9 @@ class App {
   restartSeries(id) { restartSeries(this.profile, id); }
 
   toggleFullscreen() {
-    if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
-    else document.exitFullscreen?.();
+    if (document.fullscreenElement) document.exitFullscreen?.();
+    else if (document.webkitFullscreenElement) document.webkitExitFullscreen?.();
+    else this.fullscreenTap();
   }
 }
 

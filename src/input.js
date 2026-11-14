@@ -7,13 +7,16 @@ export const SCHEMES = {
 
 /** Touch-control preferences (saved in profile.settings.touch). */
 export const TOUCH_DEFAULTS = {
-  steer: 'drag',   // 'drag' (analog slide), 'buttons' (left/right rocker) or 'tilt'
-  sens: 1,         // steering sensitivity: higher = less thumb travel / tilt for full lock
+  steer: 'drag',   // layout: 'drag' (slide to steer), 'wheel' (steering wheel), 'tilt' (gyro) or 'thumbs' (two thumbs + gear lever)
+  sens: 1,         // steering sensitivity: higher = less thumb travel / rotation / tilt for full lock
   autoGas: false,  // accelerate automatically; the right thumb only brakes and drifts
-  size: 1,         // pedal and steering size
+  size: 1,         // control size
   swap: false,     // left-handed: steer with the right thumb, pedals on the left
-  haptics: true,   // short vibrations on brake / drift (Android)
+  haptics: true,   // short vibrations on brake / drift / gear (Android)
+  fullscreen: true, // go full screen when you start driving
+  chosen: false,   // the layout chooser has been shown once
 };
+export const TOUCH_LAYOUTS = ['drag', 'wheel', 'tilt', 'thumbs'];
 
 /** Fixed control options. Gamepads are added dynamically from `connectedPads()`. */
 const BASE_CONTROLS = [
@@ -141,6 +144,7 @@ export class Input {
 
     if (playerIndex === 0 && this.touchVisible) {
       const t = this.touch;
+      if (this.touchPrefs.steer === 'thumbs') this._gearPedals();
       out.throttle = Math.max(out.throttle, t.throttle);
       out.brake = Math.max(out.brake, t.brake);
       const steer = this.touchPrefs.steer === 'tilt' ? this._tiltSteer() : t.steer;
@@ -154,28 +158,32 @@ export class Input {
 
   // ---------------------------------------------------------------- Touch
   //
-  // Built around how a phone is held in landscape: both thumbs pivot from the lower part of
-  // the short edges, so the easy reach is an arc a few centimetres in from each edge, not the
-  // corners and not the top of the screen.
+  // Built around how a phone is held in landscape: both thumbs pivot from low on the short
+  // edges, so the easy reach is an arc a few centimetres in from each edge, not the corners
+  // and not the top of the screen. Four layouts (TOUCH_LAYOUTS):
   //
-  // - Steering (left thumb) is a large invisible zone, not two small buttons. In "drag" mode
-  //   the thumb lands anywhere in it and slides sideways: analog, and the anchor follows the
-  //   thumb past full lock so reversing the steering responds at once. "Buttons" mode is one
-  //   left/right rocker the thumb can slide across, "tilt" steers with the phone and turns the
-  //   zone into a big brake pedal.
-  // - Pedals (right thumb) are one surface: the finger is hit-tested as it moves, so the thumb
-  //   slides from GAS to BRAKE or up onto DRIFT without lifting. Sliding from GAS onto DRIFT
-  //   keeps the throttle on, which is how a handbrake drift is held in this game.
-  // - Reset and pause are small and out of the thumbs' way, where they can't be hit by accident.
+  // - drag:   the left thumb lands anywhere on the left and slides sideways: analog, and the
+  //           anchor follows the thumb past full lock so reversing responds at once.
+  // - wheel:  an on-screen steering wheel the left thumb turns.
+  // - tilt:   turn the phone like a wheel; the left thumb brakes.
+  //   These three share one pedal surface for the right thumb, hit-tested as the finger moves:
+  //   hold GAS, slide inward onto BRAKE or up onto DRIFT without lifting. Sliding from GAS onto
+  //   DRIFT keeps the throttle on, which is how a drift is held in this game.
+  // - thumbs: left thumb = turn left, right thumb = turn right. In the middle a gear lever
+  //           (D drives on its own, R reverses) and BRAKE, which drops the lever back to N; held
+  //           at a stop it reverses. Plus a small DRIFT button.
+  //
+  // Reset and pause are small and out of the thumbs' way, where they can't be hit by accident.
 
   _buildTouch() {
     const el = document.createElement('div');
     el.id = 'touch-controls';
     el.className = 'hidden';
+    const spokes = [90, 210, 330].map(a => `<line x1="50" y1="50" x2="${50 + 38 * Math.cos(a * Math.PI / 180)}" y2="${50 + 38 * Math.sin(a * Math.PI / 180)}"/>`).join('');
     el.innerHTML = `
       <div class="tc-steer">
         <div class="tc-wheel"><div class="tc-track"><span>◀</span><span>▶</span><i class="tc-knob"></i></div><div class="tc-label">Slide to steer</div></div>
-        <div class="tc-rocker"><span data-side="-1">◀</span><span data-side="1">▶</span></div>
+        <div class="tc-sw"><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="43" class="rim"/><g class="spokes">${spokes}</g><circle cx="50" cy="50" r="11" class="hub"/><rect x="46" y="4" width="8" height="9" rx="2" class="mark"/></svg></div>
         <div class="tc-tiltbrake"><b>BRAKE</b><small>Tilt the phone to steer</small></div>
       </div>
       <div class="tc-pedals">
@@ -183,31 +191,46 @@ export class Input {
         <div class="tc-pedal brake" data-p="brake"><b>BRAKE</b></div>
         <div class="tc-pedal gas" data-p="gas"><b>GAS</b></div>
       </div>
+      <div class="tc-turn left" data-dir="-1"><div class="tc-pad">◀</div></div>
+      <div class="tc-turn right" data-dir="1"><div class="tc-pad">▶</div></div>
+      <div class="tc-gear" aria-label="Gear lever"><span data-g="D">D</span><span data-g="N">N</span><span data-g="R">R</span><i class="tc-gknob">N</i></div>
+      <div class="tc-mbtns">
+        <div class="tc-pedal drift" data-m="drift"><b>DRIFT</b></div>
+        <div class="tc-pedal brake" data-m="brake"><b>BRAKE</b></div>
+      </div>
       <div class="tc-sys">
         <button type="button" class="tc-btn" data-tc="reset" aria-label="Reset to track">↺</button>
         <button type="button" class="tc-btn" data-tc="pause" aria-label="Pause">❚❚</button>
       </div>
-      <div class="tc-rotate">↻ Turn your phone sideways to drive</div>`;
+      <button type="button" class="tc-btn tc-fs" data-tc="fullscreen" aria-label="Full screen">⛶</button>`;
     document.body.appendChild(el);
     this.touchEl = el;
     this.touchVisible = false;
     this.touchPrefs = { ...TOUCH_DEFAULTS };
-    this._steerPtr = null;     // { id, anchor, x, side }
+    this.vf = 0;                 // the player's forward speed (m/s), set by the race / free roam each frame
+    this.onFullscreen = null;    // set by the app: what the ⛶ button does
+    this._steerPtr = null;       // drag / wheel: { id, ... }
     this._pedalPtrs = new Map(); // pointerId -> { pedal, fromGas }
     this._tilt = null;           // { beta, gamma } from deviceorientation
     this._tiltBrake = new Set();
+    this._turns = [];            // thumbs: [{ id, dir }] most recent last
+    this._mid = new Map();       // thumbs: pointerId -> 'brake' | 'drift'
+    this.gear = 'N';             // thumbs: 'D' | 'N' | 'R'
+    this._brakeStop = false;     // thumbs: this brake press started while reversing: it only stops
 
-    const zone = el.querySelector('.tc-steer');
-    const wheel = el.querySelector('.tc-wheel');
-    const knob = el.querySelector('.tc-knob');
-    const rocker = el.querySelector('.tc-rocker');
-    const pedals = el.querySelector('.tc-pedals');
-    const pedalEls = [...pedals.querySelectorAll('[data-p]')];
-    this._els = { zone, wheel, knob, rocker, pedals, pedalEls };
+    const q = (s) => el.querySelector(s);
+    const zone = q('.tc-steer');
+    const pedals = q('.tc-pedals');
+    this._els = {
+      zone, pedals, wheel: q('.tc-wheel'), knob: q('.tc-knob'), sw: q('.tc-sw'), swSvg: q('.tc-sw svg'),
+      tiltbrake: q('.tc-tiltbrake'), pedalEls: [...pedals.querySelectorAll('[data-p]')],
+      gear: q('.tc-gear'), gknob: q('.tc-gknob'), turns: [...el.querySelectorAll('.tc-turn')], mid: [...el.querySelectorAll('[data-m]')], fs: q('.tc-fs'),
+    };
     const stop = (e) => { if (e.cancelable) e.preventDefault(); };
     const capture = (target, e) => { try { target.setPointerCapture(e.pointerId); } catch (err) { /* pointer already gone */ } };
+    const onUp = (target, fn) => { for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) target.addEventListener(ev, fn); };
 
-    // ---- steering zone
+    // ---- steering zone (drag / wheel / tilt-brake)
     zone.addEventListener('pointerdown', (e) => {
       stop(e);
       const mode = this.touchPrefs.steer;
@@ -220,24 +243,28 @@ export class Input {
       }
       if (this._steerPtr) return; // one steering thumb at a time
       capture(zone, e);
-      this._steerPtr = { id: e.pointerId, anchor: e.clientX, x: e.clientX, y: e.clientY, side: 0 };
-      if (mode === 'drag') this._placeWheel(e.clientX, e.clientY);
-      this._steerMove(e.clientX);
+      if (mode === 'wheel') {
+        const r = this._els.sw.getBoundingClientRect();
+        const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        this._steerPtr = { id: e.pointerId, cx, cy, last: Math.atan2(e.clientY - cy, e.clientX - cx), rot: 0 };
+        this._els.sw.classList.add('active');
+        return;
+      }
+      this._steerPtr = { id: e.pointerId, anchor: e.clientX };
+      this._placeWheel(e.clientX, e.clientY);
+      this._steerMove(e.clientX, e.clientY);
     });
     zone.addEventListener('pointermove', (e) => {
-      if (this._steerPtr && this._steerPtr.id === e.pointerId) this._steerMove(e.clientX);
+      if (this._steerPtr && this._steerPtr.id === e.pointerId) this._steerMove(e.clientX, e.clientY);
     });
-    const zoneUp = (e) => {
+    onUp(zone, (e) => {
       if (this._tiltBrake.delete(e.pointerId)) { this._applyTouch(); return; }
       if (!this._steerPtr || this._steerPtr.id !== e.pointerId) return;
       this._steerPtr = null;
       this.touch.steer = 0;
       this._layoutTouch();
       this._applyTouch();
-    };
-    zone.addEventListener('pointerup', zoneUp);
-    zone.addEventListener('pointercancel', zoneUp);
-    zone.addEventListener('lostpointercapture', zoneUp);
+    });
 
     // ---- pedals: one surface, the finger is hit-tested as it slides
     pedals.addEventListener('pointerdown', (e) => {
@@ -260,19 +287,78 @@ export class Input {
       if (p !== 'gas') this._buzz(p === 'drift' ? 14 : 8);
       this._applyTouch();
     });
-    const pedalUp = (e) => { if (this._pedalPtrs.delete(e.pointerId)) this._applyTouch(); };
-    pedals.addEventListener('pointerup', pedalUp);
-    pedals.addEventListener('pointercancel', pedalUp);
-    pedals.addEventListener('lostpointercapture', pedalUp);
+    onUp(pedals, (e) => { if (this._pedalPtrs.delete(e.pointerId)) this._applyTouch(); });
 
-    // ---- reset / pause
+    // ---- two thumbs: turn zones
+    for (const z of this._els.turns) {
+      const dir = +z.dataset.dir;
+      z.addEventListener('pointerdown', (e) => {
+        stop(e); capture(z, e);
+        this._turns = this._turns.filter(t => t.id !== e.pointerId);
+        this._turns.push({ id: e.pointerId, dir });
+        this._applyTouch();
+      });
+      onUp(z, (e) => {
+        const n = this._turns.length;
+        this._turns = this._turns.filter(t => t.id !== e.pointerId);
+        if (this._turns.length !== n) this._applyTouch();
+      });
+    }
+    // ---- two thumbs: brake and drift
+    for (const b of this._els.mid) {
+      const what = b.dataset.m;
+      b.addEventListener('pointerdown', (e) => {
+        stop(e); capture(b, e);
+        this._mid.set(e.pointerId, what);
+        if (what === 'brake') {
+          // braking drops the lever back to N; a press while reversing only stops the car
+          this._brakeStop = this.vf < -0.5;
+          this._setGear('N', false);
+        }
+        this._buzz(what === 'drift' ? 14 : 8);
+        this._applyTouch();
+      });
+      onUp(b, (e) => { if (this._mid.delete(e.pointerId)) this._applyTouch(); });
+    }
+    // ---- two thumbs: gear lever. Drag (or tap) it: D at the top, N in the middle, R at the bottom.
+    const gear = this._els.gear;
+    let gearPtr = null;
+    const gearAt = (y) => {
+      const r = gear.getBoundingClientRect();
+      const f = Math.min(1, Math.max(0, (y - r.top) / r.height));
+      return { f, g: f < 1 / 3 ? 'D' : f < 2 / 3 ? 'N' : 'R' };
+    };
+    gear.addEventListener('pointerdown', (e) => {
+      stop(e); capture(gear, e);
+      gearPtr = e.pointerId;
+      gear.classList.add('active');
+      const { f, g } = gearAt(e.clientY);
+      this._els.gknob.style.top = (f * 100) + '%';
+      this._setGear(g, true);
+    });
+    gear.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== gearPtr) return;
+      const { f, g } = gearAt(e.clientY);
+      this._els.gknob.style.top = (f * 100) + '%';
+      this._setGear(g, true);
+    });
+    onUp(gear, (e) => {
+      if (e.pointerId !== gearPtr) return;
+      gearPtr = null;
+      gear.classList.remove('active');
+      this._setGear(this.gear, false); // snap the knob to its slot
+    });
+
+    // ---- reset / pause / full screen
     el.querySelectorAll('[data-tc]').forEach((b) => {
       b.addEventListener('pointerdown', (e) => {
+        if (b.dataset.tc === 'fullscreen') return; // needs a click (a full user gesture) instead
         stop(e);
         if (b.dataset.tc === 'reset') this.touch.reset = true; else this.touch.pause = true;
         b.classList.add('on'); setTimeout(() => b.classList.remove('on'), 150);
       });
     });
+    this._els.fs.addEventListener('click', () => { if (this.onFullscreen) this.onFullscreen(); });
     el.addEventListener('contextmenu', stop);
 
     window.addEventListener('resize', () => { if (this.touchVisible) this._layoutTouch(); });
@@ -285,16 +371,26 @@ export class Input {
   /** Apply the player's touch preferences (see TOUCH_DEFAULTS). */
   setTouchPrefs(prefs) {
     const p = this.touchPrefs = { ...TOUCH_DEFAULTS, ...(prefs || {}) };
+    if (!TOUCH_LAYOUTS.includes(p.steer)) p.steer = 'drag';
     const el = this.touchEl;
-    el.classList.remove('mode-drag', 'mode-buttons', 'mode-tilt');
-    el.classList.add('mode-' + p.steer);
+    for (const m of TOUCH_LAYOUTS) el.classList.toggle('mode-' + m, p.steer === m);
     el.classList.toggle('swap', !!p.swap);
     el.classList.toggle('autogas', !!p.autoGas);
     el.style.setProperty('--s', String(p.size));
-    this._steerPtr = null; this._tiltBrake.clear(); this.touch.steer = 0;
+    document.body.classList.toggle('tc-thumbs', p.steer === 'thumbs');
+    this._resetTouchState();
     this._layoutTouch();
     this._applyTouch();
   }
+
+  _resetTouchState() {
+    this._steerPtr = null; this._pedalPtrs.clear(); this._tiltBrake.clear(); this._turns = []; this._mid.clear();
+    this.touch.throttle = 0; this.touch.brake = 0; this.touch.steer = 0; this.touch.handbrake = false;
+    this._setGear('N', false);
+  }
+
+  /** Show whether the ⛶ button is needed (hidden once the page is full screen). */
+  setFullscreenButton(show) { this._els.fs.classList.toggle('hidden', !show); }
 
   /** Where the steering control rests: in the left thumb's natural reach. */
   _restPoint() {
@@ -302,7 +398,7 @@ export class Input {
     const s = this.touchPrefs.size;
     const fromEdge = Math.min(Math.max(120 * s, r.width * 0.3), r.width * 0.5);
     const x = this.touchPrefs.swap ? r.right - fromEdge : r.left + fromEdge;
-    const y = r.bottom - Math.min(78 * s, r.height * 0.4);
+    const y = r.bottom - Math.min((this.touchPrefs.steer === 'wheel' ? 90 : 78) * s, r.height * 0.4);
     return { x, y, r };
   }
 
@@ -318,27 +414,33 @@ export class Input {
 
   _layoutTouch() {
     if (!this._els) return;
-    const { wheel, knob, rocker, zone } = this._els;
-    const R = this._steerRange();
-    wheel.style.setProperty('--range', R + 'px');
+    const { wheel, knob, sw, swSvg, tiltbrake, zone } = this._els;
+    wheel.style.setProperty('--range', this._steerRange() + 'px');
     knob.style.transform = 'translate(-50%, -50%)';
     wheel.classList.remove('active');
-    zone.querySelectorAll('.tc-rocker span').forEach(s => s.classList.remove('on'));
-    const { x, y } = this._restPoint();
+    sw.classList.remove('active');
+    swSvg.style.transform = 'rotate(0deg)';
+    const { x, y, r } = this._restPoint();
     this._placeWheel(x, y);
-    const r = zone.getBoundingClientRect();
-    for (const e of [rocker, zone.querySelector('.tc-tiltbrake')]) { e.style.left = (x - r.left) + 'px'; e.style.top = (y - r.top) + 'px'; }
+    for (const e of [sw, tiltbrake]) { e.style.left = (x - r.left) + 'px'; e.style.top = (y - r.top) + 'px'; }
+    void zone;
   }
 
-  _steerMove(x) {
+  _steerMove(x, y) {
     const st = this._steerPtr;
-    st.x = x;
-    if (this.touchPrefs.steer === 'buttons') {
-      const rr = this._els.rocker.getBoundingClientRect();
-      const side = x < rr.left + rr.width / 2 ? -1 : 1;
-      if (side !== st.side) { st.side = side; this._buzz(6); }
-      this._els.rocker.querySelectorAll('span').forEach(s => s.classList.toggle('on', +s.dataset.side === side));
-      this.touch.steer = side;
+    if (this.touchPrefs.steer === 'wheel') {
+      // turning the wheel: the angle the thumb sweeps round its centre
+      const dx = x - st.cx, dy = y - st.cy;
+      if (Math.hypot(dx, dy) < 14) return; // too close to the hub to read an angle
+      const a = Math.atan2(dy, dx);
+      let d = a - st.last;
+      if (d > Math.PI) d -= 2 * Math.PI; else if (d < -Math.PI) d += 2 * Math.PI;
+      st.last = a;
+      const full = (110 / (this.touchPrefs.sens || 1)) * Math.PI / 180;
+      st.rot = Math.max(-full * 1.15, Math.min(full * 1.15, st.rot + d));
+      this._els.swSvg.style.transform = `rotate(${st.rot}rad)`;
+      const k = st.rot / full, dz = 0.04;
+      this.touch.steer = Math.abs(k) <= dz ? 0 : Math.sign(k) * Math.min(1, (Math.abs(k) - dz) / (1 - dz));
       return;
     }
     // drag: analog around the anchor, which is dragged along past full lock
@@ -368,8 +470,38 @@ export class Input {
     return bestD < 40 ? best : null;
   }
 
+  _setGear(g, buzz) {
+    if (g !== this.gear) { this.gear = g; if (buzz) this._buzz(18); }
+    const { gear, gknob } = this._els;
+    if (!gear.classList.contains('active')) gknob.style.top = { D: 1 / 6, N: 0.5, R: 5 / 6 }[this.gear] * 100 + '%';
+    gknob.textContent = this.gear;
+    gear.dataset.gear = this.gear;
+  }
+
+  /** Two-thumb layout: throttle and brake come from the gear lever and BRAKE, and depend on the
+   * car's speed, so they are worked out every frame. */
+  _gearPedals() {
+    const t = this.touch;
+    let thr = 0, brk = 0;
+    const braking = [...this._mid.values()].includes('brake');
+    if (braking) {
+      if (this._brakeStop) { if (this.vf < -0.3) thr = 1; }  // pressed while reversing: just stop
+      else brk = 1;                                          // brake, and reverse once stopped
+    } else if (this.gear === 'D') thr = 1;
+    else if (this.gear === 'R') brk = 1;                     // brake input reverses once stopped
+    t.throttle = thr; t.brake = brk;
+  }
+
   _applyTouch() {
     const t = this.touch, p = this.touchPrefs;
+    if (p.steer === 'thumbs') {
+      t.steer = this._turns.length ? this._turns[this._turns.length - 1].dir : 0;
+      t.handbrake = [...this._mid.values()].includes('drift');
+      for (const z of this._els.turns) z.classList.toggle('on', this._turns.length > 0 && +z.dataset.dir === t.steer);
+      for (const b of this._els.mid) b.classList.toggle('on', [...this._mid.values()].includes(b.dataset.m));
+      this._gearPedals();
+      return;
+    }
     let gas = false, brake = this._tiltBrake.size > 0, drift = false;
     for (const f of this._pedalPtrs.values()) {
       if (f.pedal === 'gas') gas = true;
@@ -384,7 +516,7 @@ export class Input {
       const k = el.dataset.p;
       el.classList.toggle('on', k === 'gas' ? gas && !p.autoGas : k === 'brake' ? brake : drift);
     }
-    this._els.zone.querySelector('.tc-tiltbrake').classList.toggle('on', this._tiltBrake.size > 0);
+    this._els.tiltbrake.classList.toggle('on', this._tiltBrake.size > 0);
   }
 
   _buzz(ms) {
@@ -418,8 +550,7 @@ export class Input {
     this.touchEl.classList.toggle('hidden', !this.touchVisible);
     this.touchEl.classList.toggle('roam', where === 'roam');
     document.body.classList.toggle('touch-ui', this.touchVisible);
-    this._steerPtr = null; this._pedalPtrs.clear(); this._tiltBrake.clear();
-    this.touch.throttle = 0; this.touch.brake = 0; this.touch.steer = 0; this.touch.handbrake = false;
+    this._resetTouchState();
     if (this.touchVisible) { this._layoutTouch(); this._applyTouch(); }
   }
 }

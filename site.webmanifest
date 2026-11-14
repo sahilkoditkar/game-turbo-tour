@@ -4,7 +4,7 @@
   "description": "Free 3D car racing game in your browser: open-world free roam, 16 circuits, split-screen, drifting.",
   "start_url": "./",
   "scope": "./",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "landscape",
   "background_color": "#0b0d12",
   "theme_color": "#ff5a1f",

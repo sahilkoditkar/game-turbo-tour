@@ -221,6 +221,7 @@ export class Race {
 
     // Inputs
     this.players.forEach((car, i) => {
+      if (i === 0) this.input.vf = car.vf;
       const r = this.input.read(car.scheme, car.pad, i);
       if (car.finished && this.track.open) { car.input.throttle = 0; car.input.steer = 0; car.input.brake = car.vf > 1 ? 1 : 0; car.input.handbrake = car.vf <= 1; car.parked = car.speed < 0.5; }
       else if (car.finished) { car.autopilot = true; car.aiSkill = 0.7; }
