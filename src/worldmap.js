@@ -672,8 +672,9 @@ export class WorldMap {
 
   _renderSel() {
     const m = this.selected, hz = this.hz, box = this.selBox;
+    box.classList.toggle('empty', !m);
     if (!m) {
-      box.innerHTML = `<div class="meta hzmap-hint">Click a marker for details, or a road for a waypoint. Route shows in <b style="color:${ROUTE_COLOR}">purple</b>.</div>`;
+      box.innerHTML = `<div class="meta hzmap-hint">${matchMedia('(pointer: coarse)').matches ? 'Tap' : 'Click'} a marker for details, or a road for a waypoint. Route shows in <b style="color:${ROUTE_COLOR}">purple</b>.</div>`;
       return;
     }
     const d = Math.hypot(m.x - hz.car.pos.x, m.z - hz.car.pos.z);

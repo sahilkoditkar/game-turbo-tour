@@ -121,10 +121,12 @@ export class UI {
   mainMenu() {
     this.rerender = null;
     this.show(`
-      <div class="panel narrow">
+      <div class="panel narrow mainmenu"><div class="mm">
+        <div class="mm-head">
         <div class="logo">TURBO <span>TOUR</span></div>
         <div class="tagline">3D arcade racing · open world · split screen</div>
         ${this._walletBar()}
+        </div>
         <div class="menu">
           <button class="primary" data-go="horizon">Play <span class="hint" style="color:#fff;opacity:.85">Open-world career · championships, events, garage</span></button>
           <div class="menu-label">Arcade <span>· all cars unlocked, no rewards</span></div>
@@ -140,7 +142,7 @@ export class UI {
           <div class="keys-row"><span>Any</span><kbd>Esc</kbd><span>pause</span><kbd>R</kbd><span>reset</span><span>· gamepads and touch supported</span></div>
           <a href="./showroom.html">Car showroom: see every car up close →</a>
         </div>
-      </div>`, { title: '' });
+      </div></div>`, { title: '' });
     this.on('[data-go]', 'click', (e, el) => {
       const go = el.dataset.go;
       if (go === 'horizon') this.horizonIntro();
@@ -633,7 +635,7 @@ export class UI {
     this.show(`
       <div class="panel narrow">
         <h2>Paused</h2>
-        <div class="menu">
+        <div class="menu pause-menu">
           <button class="primary" data-resume>Resume</button>
           ${app.input.touchVisible ? '<button data-touchset>Touch controls <span class="hint">Layout: slide, wheel, tilt, two thumbs</span></button>' : ''}
           ${roaming ? '<button data-map>Map <span class="hint">Waypoints, fast travel, progress</span></button><button data-garage>Go to garage <span class="hint">Fast travel to Festival HQ: cars, upgrades, paint</span></button>' : '<button data-restart>Restart race</button>'}
@@ -680,7 +682,7 @@ export class UI {
             }).join('')}
             <div class="meta" style="margin-top:6px">Level ${lv.level} · ${(hz.xp || 0).toLocaleString()} XP · ${(hz.discovered || []).length} places discovered · ${((hz.stats || {}).distance || 0).toFixed(1)} km driven</div>
             <div class="field" style="margin-top:10px"><label>Controls</label>${this._controlChips(p.settings.p1Control || 'wasd', 'data-ctl="1"', 0)}</div>
-            <div class="meta"><kbd>M</kbd> map · <kbd>Enter</kbd> at a marker · <kbd>R</kbd> back to the road · <kbd>Esc</kbd> pause</div>
+            <div class="meta kbd-only"><kbd>M</kbd> map · <kbd>Enter</kbd> at a marker · <kbd>R</kbd> back to the road · <kbd>Esc</kbd> pause</div>
           </div>
         </div>
         <div class="row end" style="margin-top:18px">

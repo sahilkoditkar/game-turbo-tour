@@ -1,4 +1,4 @@
-// Free Roam HUD: speed, compass, radar minimap, waypoint, event prompt,
+// Free Roam HUD: speed, radar minimap with its compass bezel, waypoint, event prompt,
 // live drift/speed-zone score, XP, and popups/toasts for skills and discoveries.
 import { levelForXp, CITY } from './worlddef.js';
 import { terrainLayer, MAP_EXTENT, ROAD_STYLE, ROUTE_COLOR, MARKER_COLORS, drawMarkerIcon, drawPin, drawPlayerArrow, drawPropFootprints } from './worldmap.js';
@@ -32,7 +32,6 @@ export class HorizonHUD {
         <div class="hz-region">—</div>
         <div class="hz-road"></div>
       </div>
-      <canvas class="hz-compass" width="440" height="36"></canvas>
       <div class="hz-top-right">
         <div class="hz-level">LEVEL <b>1</b></div>
         <div class="hz-xpbar"><i style="width:0%"></i></div>
@@ -43,7 +42,7 @@ export class HorizonHUD {
         <div class="speed"><b>0</b><small>km/h</small></div>
         <div class="gear-bar"><i style="width:0%"></i></div>
       </div>
-      <canvas class="hz-radar"></canvas>
+      <div class="hz-radarbox"><canvas class="hz-radar"></canvas><div class="hz-radarcap"><b class="hz-capregion"></b><span class="hz-caproad"></span></div></div>
       <div class="hz-waypoint hidden"><span class="turn"></span><div><div class="instr"></div><div class="info"><b></b> · <span class="name"></span></div></div></div>
       <div class="hz-prompt hidden"></div>
       <div class="hz-guide hidden"><div><b></b><span></span></div><button class="small ghost">Skip tour</button></div>
@@ -58,7 +57,7 @@ export class HorizonHUD {
     this.el.querySelector('.hz-guide button').addEventListener('click', () => this.hz.skipGuide());
     const q = (s) => this.el.querySelector(s);
     this.q = {
-      region: q('.hz-region'), road: q('.hz-road'), compass: q('.hz-compass'), level: q('.hz-level b'), xp: q('.hz-xpbar i'), money: q('.hz-money'),
+      region: q('.hz-region'), road: q('.hz-road'), capRegion: q('.hz-capregion'), capRoad: q('.hz-caproad'), level: q('.hz-level b'), xp: q('.hz-xpbar i'), money: q('.hz-money'),
       speed: q('.speed b'), bar: q('.gear-bar i'), radar: q('.hz-radar'), wp: q('.hz-waypoint'), wpTurn: q('.hz-waypoint .turn'), wpInstr: q('.hz-waypoint .instr'), wpDist: q('.hz-waypoint .info b'), wpName: q('.hz-waypoint .name'),
       prompt: q('.hz-prompt'), live: q('.hz-live'), liveLabel: q('.hz-live .label'), liveScore: q('.hz-live .score'),
       msg: q('.msg'), msgMain: q('.msg .main'), msgSub: q('.msg .sub'), toasts: q('.hz-toasts'),
@@ -96,10 +95,10 @@ export class HorizonHUD {
     if (this.regionTimer <= 0) {
       this.regionTimer = 0.5;
       const reg = W.regionAt(car.pos.x, car.pos.z);
-      q.region.textContent = reg.name;
+      q.region.textContent = q.capRegion.textContent = reg.name;
       const s = W.samples[car.trackIdx];
       const onRoad = Math.abs(W.lateral(car.pos, car.trackIdx)) < s.hw + 3;
-      q.road.textContent = onRoad ? W.roadOf(car.trackIdx).name : (car.offroad ? 'off-road' : '');
+      q.road.textContent = q.capRoad.textContent = onRoad ? W.roadOf(car.trackIdx).name : (car.offroad ? 'off-road' : '');
       const lv = levelForXp(hz.prog.xp);
       q.level.textContent = lv.level;
       q.xp.style.width = `${Math.round((lv.into / lv.need) * 100)}%`;
@@ -137,15 +136,18 @@ export class HorizonHUD {
     if (hz.prompt) {
       const e = hz.prompt;
       q.prompt.classList.remove('hidden');
+      // on a touch screen the prompt itself is the button
+      const touch = document.body.classList.contains('touch-ui');
+      const key = touch ? '<kbd class="tap">Tap</kbd>' : '<kbd>Enter</kbd>';
       let html;
-      if (e.kind === 'garage') html = e.type === 'dealer' ? `<kbd>Enter</kbd> Browse cars at <b>${e.name}</b> · buy and drive away`
-        : e.type === 'tuning' ? `<kbd>Enter</kbd> Upgrade your car at <b>${e.name}</b>`
-        : `<kbd>Enter</kbd> Open the garage at <b>${e.name}</b> · switch car, paint, upgrade`;
+      if (e.kind === 'garage') html = e.type === 'dealer' ? `${key} Browse cars at <b>${e.name}</b> · buy and drive away`
+        : e.type === 'tuning' ? `${key} Upgrade your car at <b>${e.name}</b>`
+        : `${key} Open the garage at <b>${e.name}</b> · switch car, paint, upgrade`;
       else if (e.kind === 'series') {
         const st = hz.seriesStatus(e.series);
-        html = st.locked ? `🔒 <b>${e.name}</b> · ${st.text.replace('Locked: ', '')} <span class="meta">(Enter for details)</span>`
-          : `<kbd>Enter</kbd> <b>${e.name}</b> · ${st.text}${st.next ? ` · next: ${st.nextName || ''}` : ''}`;
-      } else html = `<kbd>Enter</kbd> Start <b>${e.name}</b> · ${e.track.kind === 'stage' ? 'point-to-point stage' : `${e.laps} laps`} · ${e.ai} rivals${hz.prog.events[e.id] ? ` · best P${hz.prog.events[e.id]}` : ''}`;
+        html = st.locked ? `🔒 <b>${e.name}</b> · ${st.text.replace('Locked: ', '')} <span class="meta">(${touch ? 'tap' : 'Enter'} for details)</span>`
+          : `${key} <b>${e.name}</b> · ${st.text}${st.next ? ` · next: ${st.nextName || ''}` : ''}`;
+      } else html = `${key} Start <b>${e.name}</b> · ${e.track.kind === 'stage' ? 'point-to-point stage' : `${e.laps} laps`} · ${e.ai} rivals${hz.prog.events[e.id] ? ` · best P${hz.prog.events[e.id]}` : ''}`;
       if (q.prompt.innerHTML !== html) q.prompt.innerHTML = html;
     } else q.prompt.classList.add('hidden');
 
@@ -155,44 +157,7 @@ export class HorizonHUD {
 
     if (this.msgTimer > 0) { this.msgTimer -= dt; if (this.msgTimer <= 0) q.msg.classList.remove('show'); }
 
-    this._drawCompass(car);
     this._drawRadar(car);
-  }
-
-  _drawCompass(car) {
-    const c = this.q.compass, ctx = c.getContext('2d');
-    const w = c.width, h = c.height;
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath(); ctx.roundRect(0, 0, w, h, 8); ctx.fill();
-    const pxPerRad = (w / 2) / (Math.PI / 2);
-    const wrap = (a) => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
-    const labels = [['S', 0], ['E', Math.PI / 2], ['N', Math.PI], ['W', -Math.PI / 2]];
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    for (let deg = 0; deg < 360; deg += 15) {
-      const a = deg * Math.PI / 180;
-      const d = wrap(a - car.heading);
-      if (Math.abs(d) > Math.PI / 2) continue;
-      const x = w / 2 - d * pxPerRad;
-      const major = deg % 90 === 0;
-      ctx.fillStyle = major ? '#fff' : 'rgba(255,255,255,0.45)';
-      ctx.fillRect(x - 1, major ? 4 : h - 10, 2, major ? 8 : 6);
-    }
-    ctx.font = '800 15px Segoe UI, Arial';
-    for (const [l, a] of labels) {
-      const d = wrap(a - car.heading);
-      if (Math.abs(d) > Math.PI / 2) continue;
-      ctx.fillStyle = l === 'N' ? '#ff5a1f' : '#fff';
-      ctx.fillText(l, w / 2 - d * pxPerRad, h / 2 + 3);
-    }
-    if (this.hz.waypoint) {
-      const wp = this.hz.waypoint;
-      const d = wrap(Math.atan2(wp.x - car.pos.x, wp.z - car.pos.z) - car.heading);
-      const x = Math.max(8, Math.min(w - 8, w / 2 - d * pxPerRad));
-      ctx.fillStyle = '#ffd23f';
-      ctx.beginPath(); ctx.moveTo(x, h - 2); ctx.lineTo(x - 6, h - 10); ctx.lineTo(x + 6, h - 10); ctx.closePath(); ctx.fill();
-    }
-    ctx.fillStyle = '#ff5a1f'; ctx.fillRect(w / 2 - 1, 0, 2, h);
   }
 
   /** GTA-style radar: heading-up terrain, roads by class, the GPS route, and markers clamped to the edge. */
@@ -310,14 +275,44 @@ export class HorizonHUD {
       }
     }
     drawPlayerArrow(ctx, cx, cy, 0, 8);
-    // north marker on the rim
-    const nP = toR(car.pos.x, car.pos.z - 10000), nE = this._edge(cx, cy, nP, cw, ch, 11);
-    ctx.fillStyle = 'rgba(10,14,22,0.85)'; ctx.beginPath(); ctx.arc(nE.x, nE.y, 8, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#ff5a1f'; ctx.font = '900 10px Segoe UI, Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('N', nE.x, nE.y + 0.5);
+    this._drawBezel(ctx, car, toR, cx, cy, cw, ch);
     ctx.restore();
     ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.roundRect(1, 1, cw - 2, ch - 2, rad); ctx.stroke();
+  }
+
+  /** The compass, built into the radar like the open-world games do it: N / E / S / W ride the rim
+   * as the radar turns, and a heading readout ("NW 315°") sits on the top edge. A rim letter that
+   * would sit under the readout is left out: the readout already says it. */
+  _drawBezel(ctx, car, toR, cx, cy, cw, ch) {
+    const small = ch < 130;
+    const r = small ? 6.5 : 8;
+    const font = (px) => `900 ${px}px Segoe UI, Arial`;
+    // compass bearing: 0° north (-z), 90° east (+x)
+    const bearing = ((180 - car.heading * 180 / Math.PI) % 360 + 360) % 360;
+    const card = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(bearing / 45) % 8];
+    const label = `${card} ${String(Math.round(bearing) % 360).padStart(3, '0')}°`;
+    ctx.font = font(small ? 9 : 11);
+    const tw = ctx.measureText(label).width + (small ? 12 : 16), th = small ? 15 : 19;
+    const tx = cw / 2 - tw / 2, ty = 3;
+    const D = 10000;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const [l, dx, dz] of [['N', 0, -D], ['E', D, 0], ['S', 0, D], ['W', -D, 0]]) {
+      const e = this._edge(cx, cy, toR(car.pos.x + dx, car.pos.z + dz), cw, ch, r + 3);
+      if (e.y < ty + th + r && Math.abs(e.x - cw / 2) < tw / 2 + r) continue;
+      ctx.fillStyle = l === 'N' ? 'rgba(10,14,22,0.9)' : 'rgba(10,14,22,0.7)';
+      ctx.beginPath(); ctx.arc(e.x, e.y, l === 'N' ? r : r - 1, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = l === 'N' ? '#ff5a1f' : 'rgba(255,255,255,0.9)';
+      ctx.font = font(l === 'N' ? (small ? 9 : 10) : (small ? 8 : 9));
+      ctx.fillText(l, e.x, e.y + 0.5);
+    }
+    // heading readout on the top edge, with a notch pointing down the way you face
+    ctx.fillStyle = 'rgba(10,14,22,0.85)';
+    ctx.beginPath(); ctx.roundRect(tx, ty, tw, th, th / 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cw / 2 - 4, ty + th); ctx.lineTo(cw / 2 + 4, ty + th); ctx.lineTo(cw / 2, ty + th + 4); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = card === 'N' ? '#ff5a1f' : '#fff';
+    ctx.font = font(small ? 9 : 11);
+    ctx.fillText(label, cw / 2, ty + th / 2 + 0.5);
   }
 
   /** Where the ray from (cx, cy) toward p leaves the radar rectangle (inset by m). */
