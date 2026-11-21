@@ -1,6 +1,11 @@
-// Portrait (2:3) CrazyGames preview video: 1080x1620, H.264, 30 fps, ~17.5 s, silent.
+// Portrait (2:3) CrazyGames preview video: 1080x1620, H.264, 30 fps, 16.7 s, silent.
 //
-//   node scripts/media/video-portrait.mjs [outDir] [--only=race,drift,roam,logo] [--probe] [--no-encode]
+//   node scripts/media/video-portrait.mjs [framesDir] [--only=race,drift,roam] [--no-encode] [--probe [--every=N]]
+//
+// Shots (hard cuts): race (Azure Coast pack start, 5 s), drift (Mesa Verde Dash, 4.2 s), roam (Free Roam
+// into Turbo City with traffic, 6 s, ending on a 1.5 s TURBO TOUR card). --only re-renders some shots and
+// re-encodes from the frames already in framesDir; --probe only screenshots every Nth frame and skips encoding.
+// Takes ~6-8 minutes (about 0.6 s per frame with SwiftShader).
 //
 // Real gameplay captured headless. Time is deterministic: an init script replaces performance.now,
 // Date.now, requestAnimationFrame and Math.random, so the game only advances when we step it (1/30 s per
@@ -8,17 +13,19 @@
 // screenshot (canvas + HUD DOM). The PNGs go to outDir and are encoded with ffmpeg into
 // media/video/portrait-1080x1620.mp4. Nothing under src/ is changed; HUD tweaks are injected CSS.
 import { serve, chromium } from '../../tests/helpers.mjs';
-import { mkdirSync, rmSync, existsSync, readdirSync } from 'node:fs';
+import { mkdirSync, rmSync, readdirSync, symlinkSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const args = process.argv.slice(2);
 const flag = (n) => args.includes('--' + n);
 const opt = (n, d) => { const a = args.find((x) => x.startsWith(`--${n}=`)); return a ? a.split('=')[1] : d; };
-const OUT = resolve(args.find((a) => !a.startsWith('--')) || join(ROOT, '.video-portrait-frames'));
-const ONLY = opt('only', 'race,drift,roam,logo').split(',');
+const OUT = resolve(args.find((a) => !a.startsWith('--')) || join(tmpdir(), 'turbotour-video-portrait'));
+const ORDER = ['race', 'drift', 'roam'];
+const ONLY = opt('only', ORDER.join(',')).split(',');
 const PROBE = flag('probe');
 const PORT = 8603;
 const FPS = 30;
@@ -95,7 +102,7 @@ async function record(page, dir, n, perFrame) {
   for (let i = 0; i < n; i++) {
     if (perFrame) await page.evaluate(perFrame, i);
     await step(page, 1);
-    if (!PROBE || i % 10 === 0) await shoot(page, join(dir, `f${String(i).padStart(4, '0')}.png`));
+    if (!PROBE || i % +opt('every', 10) === 0) await shoot(page, join(dir, `f${String(i).padStart(4, '0')}.png`));
     if (i % 30 === 29) console.log(`  ${i + 1}/${n} (${((Date.now() - t0) / (i + 1) / 1000).toFixed(2)} s/frame)`);
   }
 }
@@ -129,6 +136,9 @@ async function startRace(page, { track, ai, car, laps = 3, difficulty = 3, after
   if (afterGo > 0) await warm(page, Math.round(afterGo * FPS));
 }
 
+const DRIFT_CFG = { start: +opt('dstart', 252), end: +opt('dend', 366), kickAt: +opt('kickat', 250), kickT: +opt('kickt', 0.35), holdK: +opt('holdk', 0.6),
+  thr: 0.6, vT: +opt('dvt', 130), outMax: +opt('outmax', 0.42), lead: +opt('lead', 14), kicks: +opt('kicks', 2) };
+const ROAM_FRAMES = +opt('roamframes', 180), LOGO_FRAMES = +opt('logoframes', 45);
 const SHOTS = {
   // 1. Pack racing: Azure Coast, seven Dynamic AI cars, the player (on autopilot) in the pack just after the start.
   race: { frames: 150, async setup(page) { await startRace(page, { track: 'coastal', ai: 7, car: 'super', afterGo: +opt('after', 0.6) }); } },
@@ -136,26 +146,49 @@ const SHOTS = {
   // 2. Drift: Mesa Verde Dash, a handbrake flick into the long right-hander after the first straight,
   //    held on the throttle (steering into the slide, as a player does), then caught and driven out.
   drift: {
-    frames: 120,
+    frames: 126,
     async setup(page) {
       await startRace(page, { track: 'desert', ai: 7, car: 'super' });
-      await page.evaluate(installDrift, { start: 252, end: 366, kickAt: 250, kickT: 0.35, holdK: 0.6, thr: 0.6, vT: 130, outMax: +opt('outmax', 0.42), lead: +opt('lead', 20) });
+      await page.evaluate(installDrift, DRIFT_CFG);
       // drive (autopilot) up the straight until shortly before the corner
       await page.evaluate(() => { const r = window.app.renderer, o = r.render; r.render = () => {}; const c = window.app.race.players[0]; let n = 0; while (!(c.lap >= 1 && c.trackIdx >= window.__driftCfg.from && c.trackIdx < window.__driftCfg.end) && n++ < 3000) { window.__driftStep(); window.__steps(1); } r.render = o; });
     },
     perFrame: () => window.__driftStep(),
   },
 
-  // 3. Free Roam: Turbo Blvd through Turbo City with ambient traffic.
+  // 3. Free Roam: North Gate Rd into Turbo City with ambient traffic (oncoming cars, an overtake, a near miss),
+  //    then the TURBO TOUR end card fading in over the still-running game.
   roam: {
-    frames: 180,
+    frames: ROAM_FRAMES + LOGO_FRAMES,
     async setup(page) {
-      await page.evaluate(installRoam, { road: opt('road', 'st-ns2'), li: +opt('li', 40), dir: 1, vT: +opt('vt', 27) });
-      await page.evaluate((n) => { const r = window.app.renderer, o = r.render; r.render = () => {}; for (let i = 0; i < n; i++) { window.__roamStep(); window.__steps(1); } r.render = o; }, Math.round(+opt('roamwarm', 4) * FPS));
+      await page.evaluate(installRoam, { road: opt('road', 'st-ns3'), li: +opt('li', 120), dir: 1, vT: +opt('vt', 36) });
+      await page.evaluate((n) => { const r = window.app.renderer, o = r.render; r.render = () => {}; for (let i = 0; i < n; i++) { window.__roamStep(); window.__steps(1); } r.render = o; }, Math.round(+opt('roamwarm', 7) * FPS));
+      await page.evaluate(installEndCard);
+      await page.evaluate((n) => { window.__endCardFrom = n; }, ROAM_FRAMES);
     },
-    perFrame: () => window.__roamStep(),
+    perFrame: (i) => { window.__roamStep(); window.__endCard(i - window.__endCardFrom); },
   },
 };
+
+/** In the page: the end card (logo in the game's own .logo style), faded in frame by frame. */
+function installEndCard() {
+  const el = document.createElement('div');
+  el.id = 'endcard';
+  el.innerHTML = '<div class="logo" style="font-size:66px">TURBO <span>TOUR</span></div>'
+    + '<div class="tagline" style="margin:18px 0 0;font-size:14px;color:#e6e9ef">Race · Drift · Free Roam</div>'
+    + '<div style="margin-top:26px;padding:10px 22px;border-radius:999px;background:var(--accent);color:#fff;font-weight:800;letter-spacing:.12em;font-size:15px">PLAY FREE</div>';
+  el.style.cssText = 'position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;'
+    + 'background:radial-gradient(ellipse at 50% 46%, rgba(255,90,31,.28), transparent 62%), rgba(8,10,15,.62);backdrop-filter:blur(5px);pointer-events:none';
+  document.body.appendChild(el);
+  const logo = el.querySelector('.logo');
+  window.__endCard = (k) => {
+    if (k < 0) return;
+    const a = Math.min(1, (k + 1) / 9), e = 1 - Math.pow(1 - a, 3);
+    el.style.opacity = String(e);
+    logo.style.transform = `scale(${(1.18 - 0.18 * e).toFixed(4)})`;
+    document.getElementById('hud-layer').style.opacity = String(1 - e);
+  };
+}
 
 /** In the page: a drift controller for player 1 (inputs as a player would give them). */
 async function installDrift(cfg) {
@@ -164,11 +197,15 @@ async function installDrift(cfg) {
   window.__driftCfg = { ...cfg, from: cfg.kickAt - cfg.lead };
   const orig = app.input.read.bind(app.input);
   app.input.read = (s, p, i) => { const r = orig(s, p, i); return i === 0 && window.__ctl ? { ...r, ...window.__ctl } : r; };
-  const D = { phase: 'approach', t: 0, s: 1 };
+  const D = { phase: 'approach', t: 0, s: 1, kicks: 0 };
   window.__driftStep = () => {
     const tr = race.track, idx = car.trackIdx;
-    if (D.phase === 'approach' && idx >= cfg.kickAt && idx < cfg.end) { D.phase = 'kick'; D.t = 0; D.s = -Math.sign(tr.samples[cfg.start + 10].curv); car.autopilot = false; }
+    if (D.phase === 'approach' && idx >= cfg.kickAt && idx < cfg.end) { D.phase = 'kick'; D.t = 0; D.kicks++; D.s = -Math.sign(tr.samples[cfg.start + 10].curv); car.autopilot = false; }
     D.t += 1 / 30;
+    if (D.phase === 'done' && D.kicks < cfg.kicks && idx < cfg.end - 40 && D.t > 1.2) {
+      const m = tr.samples[idx].hw - Math.abs(tr.lateral(car.pos, idx));
+      if (m > 0.55 * tr.samples[idx].hw) { D.phase = 'kick'; D.t = 0; D.kicks++; car.autopilot = false; }
+    }
     if (D.phase === 'approach' || D.phase === 'done') { car.autopilot = true; window.__ctl = null; return; }
     driveAI(car, { track: tr, cars: race.cars, live: true, bestPlayerProgress: null, time: race.time, dynamic: race.dynamic }, 1 / 30);
     const ai = { ...car.input };
@@ -179,7 +216,7 @@ async function installDrift(cfg) {
       const lat = tr.lateral(car.pos, idx), hw = tr.samples[idx].hw;
       const st = D.s * Math.max(0.3, Math.min(1, cfg.holdK + 0.6 * D.s * ai.steer));
       window.__ctl = { throttle: car.speed > cfg.vT / 3.6 ? 0.25 : 1, brake: 0, steer: st, handbrake: false };
-      if (idx >= cfg.end - 8 || D.t > 3.5 || -D.s * lat > cfg.outMax * hw) { D.phase = 'done'; car.autopilot = true; window.__ctl = null; }
+      if (idx >= cfg.end - 8 || D.t > 3.5 || -D.s * lat > cfg.outMax * hw) { D.phase = 'done'; D.t = 0; car.autopilot = true; window.__ctl = null; }
     }
   };
 }
@@ -241,7 +278,7 @@ async function runShot(page, name, n) {
 }
 
 async function main() {
-    mkdirSync(OUT, { recursive: true });
+  mkdirSync(OUT, { recursive: true });
   const srv = await serve(ROOT, PORT);
   const browser = await chromium.launch();
   try {
@@ -257,8 +294,27 @@ async function main() {
     await browser.close();
     srv.stop();
   }
+  if (!PROBE && !flag('no-encode')) encode();
+}
+
+/** Concatenate the shots' PNGs in order and encode the H.264 MP4. */
+function encode() {
+  const seq = join(OUT, 'seq');
+  rmSync(seq, { recursive: true, force: true });
+  mkdirSync(seq, { recursive: true });
+  let n = 0;
+  for (const name of ORDER) {
+    const files = readdirSync(join(OUT, name)).filter((f) => f.endsWith('.png')).sort();
+    if (files.length !== SHOTS[name].frames) throw new Error(`${name}: ${files.length} frames, expected ${SHOTS[name].frames}`);
+    for (const f of files) symlinkSync(join(OUT, name, f), join(seq, `${String(n++).padStart(5, '0')}.png`));
+  }
+  mkdirSync(dirname(VIDEO), { recursive: true });
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(FPS), '-i', join(seq, '%05d.png'),
+    '-vf', `scale=${W * DSF}:${H * DSF}:flags=lanczos,format=yuv420p`, '-c:v', 'libx264', '-preset', 'slow', '-crf', opt('crf', '19'),
+    '-profile:v', 'high', '-pix_fmt', 'yuv420p', '-r', String(FPS), '-movflags', '+faststart', '-an', VIDEO], { stdio: 'inherit' });
+  console.log(`${VIDEO}: ${n} frames, ${(n / FPS).toFixed(2)} s`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch((e) => { console.error(e); process.exit(1); });
 
-export { installRoam, installDrift, newPage, startRace, warm, step, shoot, record, serve, chromium, ROOT, PORT };
+export { DRIFT_CFG, SHOTS, installRoam, installDrift, newPage, startRace, warm, step, shoot, record, serve, chromium, ROOT, PORT };

@@ -36,10 +36,12 @@ const SCENE = {
   car: opt('car', 'fiamma'),
   colorIndex: +opt('color', 0),   // paint (PLAYER_COLORS): 0 Festival Orange, the game's accent colour
   aiCount: 7,
+  debug: flag('debug'),
+  difficulty: +opt('difficulty', 0),   // Quick Race AI: 0 easy, 1 medium, 2 hard, 3 dynamic
   minTime: +opt('mintime', 2.5),   // race seconds before looking for a moment
   maxTime: 90,
   at: opt('at') ? +opt('at') : null,
-  want: +opt('want', 5),   // moment score to stop at (rivals behind, max 4, +1 if one is within 14 m)
+  want: +opt('want', 6),   // moment score to stop at (rivals behind, max 4, +1 if one is within 14 m, +1 over 40 m/s)
   seed: +opt('seed', 7),   // Math.random is seeded, so the race (and the shot) is reproducible   // a fixed race time instead of searching
 };
 
@@ -87,13 +89,15 @@ async function render() {
   // race is stepped with a fixed dt, so the replay is identical to the search run.
   const moment = await page.evaluate((s) => {
     const app = window.app, dt = 1 / 60;
-    app.setup = { mode: 'quick', trackId: s.track, laps: 5, aiCount: s.aiCount, difficulty: 3,
+    app.setup = { mode: 'quick', trackId: s.track, laps: 5, aiCount: s.aiCount, difficulty: s.difficulty,
       players: [{ name: 'You', carId: s.car, colorIndex: s.colorIndex, control: 'wasd' }, { name: 'P2', carId: 'hornet', colorIndex: 1, control: 'arrows' }] };
     let r, hero;
+    const trace = [];
     const start = () => {
       window.__reseed(s.seed);
       app.startQuickRace('quick');
       app.paused = true;
+      window.__reseed(s.seed + 1);   // again: building a race draws a different count the second time (cached models)
       r = app.race; hero = r.players[0];
       hero.autopilot = true; hero.aiSkill = 1.0;
       // pole position: swap the hero with the car at the front of the grid
@@ -117,9 +121,10 @@ async function render() {
         if (d > 2 && d < 40 && Math.abs(lat) < 14) blocked++;                // ahead of the hero
         if (d >= -6 && d <= 2 && lat < -1.5) blocked++;                      // alongside, on the camera's side
       }
-      const calm = Math.abs(hero.pitch) < 0.03 && Math.abs(hero.slide || 0) < 0.15 && !hero.spinTime && !hero.offroad;
+      const calm = Math.abs(hero.pitch) < 0.06 && Math.abs(hero.slide || 0) < 0.4 && !hero.spinTime && !hero.offroad;
+      if (s.debug) trace.push([+r.time.toFixed(1), hero.rank, behind, blocked, calm ? 1 : 0, Math.round(hero.speed)].join(' '));
       if (blocked || !calm || hero.speed < 28) return -1;
-      return Math.min(behind, 4) + close;
+      return Math.min(behind, 4) + close + (hero.speed > 40 ? 1 : 0);
     };
     let best = { sc: -Infinity, step: 0 };
     if (s.at !== null) best.step = Math.round((s.at + 3.9) / dt);   // the countdown is 3.9 s
@@ -135,7 +140,7 @@ async function render() {
     }
     start();
     for (let step = 1; step <= best.step; step++) r.update(dt);
-    return { time: r.time, score: score(), speed: hero.speed, rank: hero.rank };
+    return { time: +r.time.toFixed(2), score: score(), found: best.sc, trace: s.debug ? trace.filter((_, i) => i % 10 === 0) : undefined, speed: +hero.speed.toFixed(1), rank: hero.rank };
   }, SCENE);
   log('moment:', JSON.stringify(moment));
   for (const name of ONLY) {
