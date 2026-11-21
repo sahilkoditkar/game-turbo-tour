@@ -4,17 +4,20 @@
 //   node scripts/media/covers.mjs --render-only   only the raw renders (into the work dir)
 //   node scripts/media/covers.mjs --compose-only  only the logo pass, from the last raw renders
 //   options: --port 8601  --work <dir> (raw renders; default: the OS temp dir)  --only landscape,square
+//            --track coastal --car centro --color 0 --seed 7 --at <race s> --samples 16 --debug (to try other shots)
 //
 // Needs Playwright with Chromium (as the headless tests do) and the Inter font (Black Italic) installed
 // for the logo; nothing is installed in the repository. Headless WebGL runs on SwiftShader, so a full run
 // takes a few minutes. Outputs: media/covers/{landscape-1920x1080,portrait-800x1200,square-800x800}.{png,jpg}
 //
-// How a shot is made: a Quick Race (Dynamic AI, which races around the player, so the field stays
-// bunched) with the player's car on autopilot. The hero car is moved to pole during the countdown,
-// the race is stepped forward off-screen until a few rivals are right behind it, then the game is
-// paused and the camera is placed by hand for each aspect ratio and the frame is rendered at 2x.
-import { serve, chromium, atMenu, until, sleep } from '../../tests/helpers.mjs';
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+// How a shot is made: a Quick Race against 7 AI cars with the player's car on autopilot (the game's own
+// AI driving). The hero car is moved to pole on the grid, the race is stepped forward off-screen with a
+// fixed time step until rivals are right behind it (then replayed to that moment, Math.random being
+// seeded), the game is paused and the camera placed by hand for each aspect ratio. Each frame is
+// rendered at 2x and averaged over a short shutter with the camera locked to the car (motion blur:
+// the car stays sharp, the road streaks). The logo is then laid over it in an HTML page and captured.
+import { serve, chromium, atMenu, sleep } from '../../tests/helpers.mjs';
+import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -32,17 +35,17 @@ const SAMPLES = +opt('samples', 16);
 
 // ------------------------------------------------------------------ the shot
 const SCENE = {
-  track: opt('track', 'spa'),
-  car: opt('car', 'fiamma'),
+  track: opt('track', 'coastal'),   // Azure Coast: palms, the start gantry, the pack right behind
+  car: opt('car', 'centro'),        // Centro GT, the McLaren F1-style hypercar
   colorIndex: +opt('color', 0),   // paint (PLAYER_COLORS): 0 Festival Orange, the game's accent colour
   aiCount: 7,
   debug: flag('debug'),
   difficulty: +opt('difficulty', 0),   // Quick Race AI: 0 easy, 1 medium, 2 hard, 3 dynamic
   minTime: +opt('mintime', 2.5),   // race seconds before looking for a moment
   maxTime: 90,
-  at: opt('at') ? +opt('at') : null,
+  at: opt('at') ? +opt('at') : null,   // a fixed race time instead of searching
   want: +opt('want', 6),   // moment score to stop at (rivals behind, max 4, +1 if one is within 14 m, +1 over 40 m/s)
-  seed: +opt('seed', 7),   // Math.random is seeded, so the race (and the shot) is reproducible   // a fixed race time instead of searching
+  seed: +opt('seed', 7),   // Math.random is seeded, so the race (and the shot) is reproducible
 };
 
 // Camera rigs. The camera stands on the track `ahead` metres in front of the hero car, at `lat`
@@ -50,9 +53,21 @@ const SCENE = {
 // above the road, and looks at a point given relative to the car (fwd along its heading, left to its left); roll tilts it (degrees).
 // shift moves the subject in the frame (fraction of the frame, like a shift lens) without changing perspective.
 const COVERS = {
-  landscape: { w: 1920, h: 1080, cam: { ahead: 13, lat: -0.85, up: 2.0, look: { fwd: 0, left: 0, up: 0.75 }, fov: 26, roll: -4, shift: [0.18, 0.08] } },
-  portrait:  { w: 800, h: 1200, cam: { ahead: 13, lat: -0.7, up: 1.1, look: { fwd: -1, left: 0, up: 0.75 }, fov: 34, roll: -4, shift: [0, 0.18] } },
-  square:    { w: 800, h: 800, cam: { ahead: 14, lat: -0.72, up: 1.05, look: { fwd: -0.5, left: 0, up: 0.75 }, fov: 30, roll: -4, shift: [0.05, 0.14] } },
+  // the logo: top-left corner of its block at (x, y) in px, font size in px; align 'left' | 'center'.
+  // Kept well inside the frame: portals put badges on the corners and the title along the bottom.
+  // scrim: a dark gradient behind the logo so it reads on any background.
+  landscape: { w: 1920, h: 1080,
+    cam: { ahead: 9.5, lat: -0.85, up: 1.7, look: { fwd: 0, left: 0, up: 0.75 }, fov: 27, roll: -4, shift: [0.2, 0.2] },
+    logo: { x: 140, y: 120, size: 230, align: 'left' },
+    scrim: 'radial-gradient(ellipse 46% 50% at 24% 30%, rgba(10,16,34,.58) 0%, rgba(10,16,34,.36) 50%, rgba(10,16,34,0) 100%)' },
+  portrait: { w: 800, h: 1200,
+    cam: { ahead: 12, lat: -0.4, up: 2.6, look: { fwd: -2, left: 0, up: 0.75 }, fov: 32, roll: -3, shift: [-0.05, 0.22] },
+    logo: { x: 0, y: 170, size: 172, align: 'center' },
+    scrim: 'linear-gradient(180deg, rgba(10,16,34,.62) 0%, rgba(10,16,34,.42) 30%, rgba(10,16,34,.12) 44%, rgba(10,16,34,0) 52%)' },
+  square: { w: 800, h: 800,
+    cam: { ahead: 11, lat: -0.65, up: 2.0, look: { fwd: -1, left: 0, up: 0.75 }, fov: 30, roll: -4, shift: [0.08, 0.18] },
+    logo: { x: 0, y: 105, size: 150, align: 'center' },
+    scrim: 'radial-gradient(ellipse 62% 40% at 50% 28%, rgba(10,16,34,.6) 0%, rgba(10,16,34,.36) 55%, rgba(10,16,34,0) 100%)' },
 };
 const ONLY = opt('only', Object.keys(COVERS).join(',')).split(',');
 
@@ -224,10 +239,22 @@ async function compose() {
 }
 
 function overlayHtml(name, cv, img) {
+  const L = cv.logo;
   return `<!doctype html><meta charset="utf-8"><style>
   html, body { margin: 0; width: ${cv.w}px; height: ${cv.h}px; overflow: hidden; background: #0b0d12; }
-  img { position: absolute; inset: 0; width: 100%; height: 100%; }
-  </style><img src="${img}">`;
+  .shot { position: absolute; inset: 0; width: 100%; height: 100%; filter: saturate(1.12) contrast(1.06); }
+  .scrim { position: absolute; inset: 0; background: ${cv.scrim}; }
+  .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse 85% 85% at 55% 55%, transparent 60%, rgba(5,6,10,.45) 100%); }
+  /* the game's .logo: heavy italic caps, TOUR in the accent colour */
+  .logo { position: absolute; left: ${L.x}px; top: ${L.y}px; ${L.align === 'center' ? `width: ${cv.w - 2 * L.x}px; text-align: center;` : ''}
+    margin: 0; font: italic 900 ${L.size}px/0.9 Inter, 'Inter Display', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    letter-spacing: .01em; color: #f4f5f7; text-transform: uppercase;
+    text-shadow: ${L.size * 0.012}px ${L.size * 0.03}px 0 rgba(6,8,14,.55), 0 ${L.size * 0.04}px ${L.size * 0.16}px rgba(0,0,0,.6); }
+  .logo span { display: block; color: #ff5a1f; text-shadow: ${L.size * 0.012}px ${L.size * 0.03}px 0 rgba(60,14,0,.6), 0 0 ${L.size * 0.3}px rgba(255,90,31,.4), 0 ${L.size * 0.04}px ${L.size * 0.16}px rgba(0,0,0,.5); }
+  .logo i { display: block; }
+  </style>
+  <img class="shot" src="${img}"><div class="vignette"></div><div class="scrim"></div>
+  <h1 class="logo"><i>TURBO</i><span>TOUR</span></h1>`;
 }
 
 if (!flag('compose-only')) await render();

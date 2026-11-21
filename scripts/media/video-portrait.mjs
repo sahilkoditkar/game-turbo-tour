@@ -1,9 +1,9 @@
-// Portrait (2:3) CrazyGames preview video: 1080x1620, H.264, 30 fps, 16.7 s, silent.
+// Portrait (2:3) CrazyGames preview video: 1080x1620, H.264, 30 fps, 16.5 s, silent.
 //
 //   node scripts/media/video-portrait.mjs [framesDir] [--only=race,drift,roam] [--no-encode] [--probe [--every=N]]
 //
-// Shots (hard cuts): race (Azure Coast pack start, 5 s), drift (Mesa Verde Dash, 4.2 s), roam (Free Roam
-// into Turbo City with traffic, 6 s, ending on a 1.5 s TURBO TOUR card). --only re-renders some shots and
+// Shots (hard cuts): race (Azure Coast pack start, 4 s), drift (Mesa Verde Dash, 4.7 s), roam (Free Roam
+// into Turbo City with traffic, 6.3 s, ending on a 1.5 s TURBO TOUR card). --only re-renders some shots and
 // re-encodes from the frames already in framesDir; --probe only screenshots every Nth frame and skips encoding.
 // Takes ~6-8 minutes (about 0.6 s per frame with SwiftShader).
 //
@@ -121,7 +121,7 @@ async function newPage(browser, url) {
 
 // ---------------------------------------------------------------- shots
 /** Quick Race straight from app.setup; returns once the race is live (after `afterGo` seconds of racing, fast-forwarded). */
-async function startRace(page, { track, ai, car, laps = 3, difficulty = 3, afterGo = 0 }) {
+async function startRace(page, { track, ai, car, laps = 3, difficulty = 3, afterGo = 0, skill = 0.95 }) {
   await page.evaluate(({ track, ai, car, laps, difficulty }) => {
     const app = window.app;
     app.setup = { trackId: track, laps, aiCount: ai, difficulty, mode: 'quick',
@@ -132,21 +132,21 @@ async function startRace(page, { track, ai, car, laps = 3, difficulty = 3, after
   await page.evaluate(() => { window.__auto = false; });
   // countdown (3.9 s) without rendering
   await warm(page, 120);
-  await page.evaluate(() => { const p = window.app.race.players[0]; p.autopilot = true; p.aiSkill = 0.95; });
+  await page.evaluate((skill) => { const p = window.app.race.players[0]; p.autopilot = true; p.aiSkill = skill; }, skill);
   if (afterGo > 0) await warm(page, Math.round(afterGo * FPS));
 }
 
 const DRIFT_CFG = { start: +opt('dstart', 252), end: +opt('dend', 366), kickAt: +opt('kickat', 250), kickT: +opt('kickt', 0.35), holdK: +opt('holdk', 0.6),
   thr: 0.6, vT: +opt('dvt', 130), outMax: +opt('outmax', 0.42), lead: +opt('lead', 14), kicks: +opt('kicks', 2) };
-const ROAM_FRAMES = +opt('roamframes', 180), LOGO_FRAMES = +opt('logoframes', 45);
+const ROAM_FRAMES = +opt('roamframes', 189), LOGO_FRAMES = +opt('logoframes', 45);
 const SHOTS = {
   // 1. Pack racing: Azure Coast, seven Dynamic AI cars, the player (on autopilot) in the pack just after the start.
-  race: { frames: 150, async setup(page) { await startRace(page, { track: 'coastal', ai: 7, car: 'super', afterGo: +opt('after', 0.6) }); } },
+  race: { frames: 120, async setup(page) { await startRace(page, { track: opt('track', 'coastal'), ai: 7, car: 'super', afterGo: +opt('after', 0.6), skill: +opt('skill', 0.95), difficulty: +opt('diff', 3) }); } },
 
   // 2. Drift: Mesa Verde Dash, a handbrake flick into the long right-hander after the first straight,
   //    held on the throttle (steering into the slide, as a player does), then caught and driven out.
   drift: {
-    frames: 126,
+    frames: 141,
     async setup(page) {
       await startRace(page, { track: 'desert', ai: 7, car: 'super' });
       await page.evaluate(installDrift, DRIFT_CFG);
@@ -304,7 +304,7 @@ function encode() {
   mkdirSync(seq, { recursive: true });
   let n = 0;
   for (const name of ORDER) {
-    const files = readdirSync(join(OUT, name)).filter((f) => f.endsWith('.png')).sort();
+    const files = readdirSync(join(OUT, name)).filter((f) => f.endsWith('.png')).sort().slice(0, SHOTS[name].frames);
     if (files.length !== SHOTS[name].frames) throw new Error(`${name}: ${files.length} frames, expected ${SHOTS[name].frames}`);
     for (const f of files) symlinkSync(join(OUT, name, f), join(seq, `${String(n++).padStart(5, '0')}.png`));
   }
