@@ -15,7 +15,7 @@
 // a shot are simulated without rendering ("pre-roll"), which is cheap.
 import { mkdir, rm, readdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { serve, chromium } from '../../tests/helpers.mjs';
 
@@ -42,6 +42,7 @@ const TIME_SHIM = `(() => {
   const anims = new WeakMap();    // Web Animation (CSS animations/transitions) -> virtual start time
   // seeded Math.random so a re-run gives the same AI wobble / traffic choices
   let seed = 20261121 >>> 0;
+  window.__reseed = (n) => { seed = n >>> 0; };
   Math.random = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   performance.now = () => manual ? vt : pnow();
   Date.now = () => manual ? Math.round(dateBase + vt) : dnow();
@@ -91,6 +92,8 @@ const PAGE_HELPERS = `(() => {
     async install() {
       const { driveAI } = await import('/src/ai.js');
       const app = window.app, input = app.input, orig = input.read.bind(input);
+      // every rendered frame is exactly 1/30 s, the same as a pre-rolled one (so a pre-roll and a recording agree)
+      app.clock.getDelta = () => 1 / 30;
       const self = this;
       // Free Roam: follow the road the car is on (the world's sample() would run into the next road)
       const roadTrack = (W, car) => {
@@ -111,6 +114,8 @@ const PAGE_HELPERS = `(() => {
         } else return r;
         car.aiSkill = c.skill ?? 0.95;
         if (c.laneBase !== undefined) car.laneBase = c.laneBase;
+        // keep right (Free Roam traffic drives on the right; lane is measured left-positive)
+        if (c.laneFrac !== undefined) car.laneBase = 2 * c.laneFrac * ctx.track.sample(car.trackIdx).hw;
         if (c.pace !== undefined) car.paceScale = c.pace;
         driveAI(car, ctx, 1 / 30);
         const out = { ...r, throttle: car.input.throttle, brake: car.input.brake, steer: car.input.steer, handbrake: false };
@@ -128,7 +133,6 @@ const PAGE_HELPERS = `(() => {
     preroll(n) {
       const app = window.app;
       for (let i = 0; i < n; i++) { window.__clock.tick(1000 / 30); const l = this.live(); l.update(1 / 30); app.input.endFrame(); }
-      app.clock.getDelta();   // the next rendered frame sees 1/30 s, not the pre-roll
     },
   };
 })();`;
@@ -148,22 +152,28 @@ function seedSave(selected = 'super', paint = 0) {
 // ------------------------------------------------------------------ shots
 // Each shot: setup(page) builds the scene, `pre` seconds are pre-rolled to the first frame, `frames` are recorded;
 // during(page, i) runs before frame i (optional).
-const quickRace = (trackId, carId, colorIndex, aiCount, laps = 3) => (page) => page.evaluate(({ trackId, carId, colorIndex, aiCount, laps }) => {
+// gaps: the Dynamic AI's target time gaps to the player (s, negative = ahead), to keep the pack close
+const quickRace = (page, { track, car, color = 0, ai = 7, laps = 3, gaps = null, skill = 1.0, mode = 'quick' }) => page.evaluate(({ track, car, color, ai, laps, gaps, skill, mode }) => {
   const a = window.app;
+  window.__reseed(4242);
   a.disposeHorizon(); a.disposeRace();
-  a.setup = { trackId, laps, aiCount, difficulty: 3, mode: 'quick', players: [{ name: 'You', carId, colorIndex, control: 'wasd' }, { name: 'Player 2', carId: 'hornet', colorIndex: 1, control: 'arrows' }] };
-  a.startQuickRace('quick');
-}, { trackId, carId, colorIndex, aiCount, laps });
+  a.setup = { trackId: track, laps, aiCount: ai, difficulty: 3, mode, players: [{ name: 'You', carId: car, colorIndex: color, control: 'wasd' }, { name: 'Player 2', carId: car, colorIndex: 1, control: 'arrows' }] };
+  a.startQuickRace(mode);
+  if (gaps) a.race.cars.filter(c => !c.isPlayer).forEach((c, i) => { c.desiredGap = gaps[i % gaps.length]; });
+  window.__vid.ctl = mode === 'split' ? [{ skill }, { skill: skill * 0.97 }] : { skill };
+}, { track, car, color, ai, laps, gaps, skill, mode });
+const PACK = [-0.9, -0.6, -0.3, 0.25, 0.5, 0.8, 1.1, 1.4];
 
 const SHOTS = {
   // 1. Spa: the pack launches off the grid and funnels into La Source
   race: {
     frames: 140, pre: 4.6,
-    async setup(page) {
-      await quickRace('spa', 'super', 0, 7)(page);
-      await page.evaluate(() => { window.__vid.ctl = { skill: 1.0 }; });
-    },
+    setup: (page) => quickRace(page, { track: 'spa', car: 'super', ai: 6, gaps: PACK }),
   },
+  x_monza: { setup: (page) => quickRace(page, { track: 'monza', car: 'super', ai: 6, gaps: PACK }) },
+  x_silver: { setup: (page) => quickRace(page, { track: 'silverstone', car: 'fiamma', color: 10, ai: 6, gaps: PACK }) },
+  x_redbull: { setup: (page) => quickRace(page, { track: 'redbull', car: 'kaze', color: 3, ai: 6, gaps: PACK }) },
+  x_neon: { setup: (page) => quickRace(page, { track: 'neon', car: 'raiden', color: 6, ai: 6, gaps: PACK }) },
 };
 
 // ------------------------------------------------------------------ browser
@@ -252,7 +262,7 @@ async function main() {
   const g = await openGame();
   try {
     const ex = opt('explore');
-    if (ex) { await explore(g.page, ex, +(opt('seconds') || 20), +(opt('every') || 1)); return; }
+    if (ex) { for (const n of ex.split(',')) await explore(g.page, n, +(opt('seconds') || 23), +(opt('every') || 1)); return; }
     const only = (opt('shots') || '').split(',').filter(Boolean);
     for (const n of Object.keys(SHOTS)) {
       if (only.length && !only.includes(n)) continue;
@@ -263,4 +273,5 @@ async function main() {
   await encode();
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+if (import.meta.url === pathToFileURL(process.argv[1]).href) main().catch((e) => { console.error(e); process.exit(1); });
+export { openGame, quickRace, SHOTS, PACK, step, shoot, SCRATCH, FPS };
