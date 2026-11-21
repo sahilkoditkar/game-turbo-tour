@@ -27,25 +27,30 @@ const PORT = +opt('port', 8601);
 const WORK = resolve(opt('work', join(tmpdir(), 'turbo-tour-covers')));
 const OUT = join(ROOT, 'media/covers');
 const SCALE = 2;   // render at 2x, downscale when composing
+const SHUTTER = +opt('shutter', 1 / 90);   // seconds of motion blur
+const SAMPLES = +opt('samples', 16);
 
 // ------------------------------------------------------------------ the shot
 const SCENE = {
   track: opt('track', 'spa'),
   car: opt('car', 'fiamma'),
-  colorIndex: 0,            // Festival Orange (#ff5a1f), the game's accent colour
+  colorIndex: +opt('color', 0),   // paint (PLAYER_COLORS): 0 Festival Orange, the game's accent colour
   aiCount: 7,
-  minTime: +opt('mintime', 10),   // race seconds before looking for a moment
+  minTime: +opt('mintime', 2.5),   // race seconds before looking for a moment
   maxTime: 90,
+  at: opt('at') ? +opt('at') : null,
+  want: +opt('want', 5),   // moment score to stop at (rivals behind, max 4, +1 if one is within 14 m)
+  seed: +opt('seed', 7),   // Math.random is seeded, so the race (and the shot) is reproducible   // a fixed race time instead of searching
 };
 
 // Camera rigs. The camera stands on the track `ahead` metres in front of the hero car, at `lat`
 // (fraction of the half width; + is the left side of the road in the direction of travel), `up` metres
-// above the road, and looks at a point given relative to the car (fwd along its heading, side to its right).
+// above the road, and looks at a point given relative to the car (fwd along its heading, left to its left); roll tilts it (degrees).
 // shift moves the subject in the frame (fraction of the frame, like a shift lens) without changing perspective.
 const COVERS = {
-  landscape: { w: 1920, h: 1080, cam: { ahead: 16, lat: -0.75, up: 1.0, look: { fwd: 0, side: 0, up: 0.75 }, fov: 26, shift: [0.18, 0.08] } },
-  portrait:  { w: 800, h: 1200, cam: { ahead: 13, lat: -0.7, up: 1.1, look: { fwd: -1, side: 0, up: 0.75 }, fov: 34, shift: [0, 0.18] } },
-  square:    { w: 800, h: 800, cam: { ahead: 14, lat: -0.72, up: 1.05, look: { fwd: -0.5, side: 0, up: 0.75 }, fov: 30, shift: [0.05, 0.14] } },
+  landscape: { w: 1920, h: 1080, cam: { ahead: 13, lat: -0.85, up: 2.0, look: { fwd: 0, left: 0, up: 0.75 }, fov: 26, roll: -4, shift: [0.18, 0.08] } },
+  portrait:  { w: 800, h: 1200, cam: { ahead: 13, lat: -0.7, up: 1.1, look: { fwd: -1, left: 0, up: 0.75 }, fov: 34, roll: -4, shift: [0, 0.18] } },
+  square:    { w: 800, h: 800, cam: { ahead: 14, lat: -0.72, up: 1.05, look: { fwd: -0.5, left: 0, up: 0.75 }, fov: 30, roll: -4, shift: [0.05, 0.14] } },
 };
 const ONLY = opt('only', Object.keys(COVERS).join(',')).split(',');
 
@@ -57,6 +62,12 @@ async function render() {
   const first = COVERS[ONLY[0]];
   const page = await browser.newPage({ viewport: { width: first.w, height: first.h }, deviceScaleFactor: SCALE });
   page.on('pageerror', (e) => console.log('pageerror:', e.message));
+  // a deterministic Math.random (mulberry32), so the same race plays out every run
+  await page.addInitScript((seed) => {
+    let a = seed >>> 0;
+    window.__reseed = (v) => { a = v >>> 0; };
+    Math.random = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }, SCENE.seed);
   // a save that owns every car, high graphics, no sound
   await page.addInitScript((car) => {
     const ids = ['classic', 'raiden', 'muscle', 'hornet', 'rally', 'groupb', 'mamba', 'super', 'kaze', 'fiamma', 'centro', 'formula'];
@@ -71,50 +82,59 @@ async function render() {
   const log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(0)}s]`, ...a);
   await page.goto(srv.url);
   await atMenu(page);
-  await page.evaluate((s) => {
-    window.app.setup = { trackId: s.track, laps: 5, aiCount: s.aiCount, difficulty: 3,
-      players: [{ name: 'You', carId: s.car, colorIndex: s.colorIndex, control: 'wasd' }, { name: 'P2', carId: 'hornet', colorIndex: 1, control: 'arrows' }] };
-  }, SCENE);
-  await page.click('[data-go="quick"]');
-  await page.click('[data-start]');
-  await until(page, () => window.app.race && window.app.race.cars.length > 0, null, 120_000, 'race built');
-  log('race built:', SCENE.track, SCENE.car);
   await page.addStyleTag({ content: '#hud-layer, #ui-layer, #touch-controls, #rotate-overlay, #about { display: none !important; }' });
-  // step the race off-screen (much faster than real time under SwiftShader) until rivals are right behind the hero
+  // Find the moment, then replay the race to it: Math.random is reseeded before each start and the
+  // race is stepped with a fixed dt, so the replay is identical to the search run.
   const moment = await page.evaluate((s) => {
-    const app = window.app, r = app.race, hero = r.players[0];
-    app.paused = true;
-    hero.autopilot = true; hero.aiSkill = 1.0;
-    // pole position: swap the hero with the car at the front of the grid
-    const pole = r.cars.reduce((a, c) => (c.progress > a.progress ? c : a), r.cars[0]);
-    if (pole !== hero) {
-      const a = { x: hero.pos.x, y: hero.pos.y - 0.12, z: hero.pos.z, h: hero.heading, idx: hero.trackIdx, pr: hero.progress };
-      hero.place(pole.pos.x, pole.pos.z, pole.heading, pole.pos.y - 0.12); hero.trackIdx = pole.trackIdx; hero.progress = pole.progress;
-      pole.place(a.x, a.z, a.h, a.y); pole.trackIdx = a.idx; pole.progress = a.pr;
-    }
-    const dt = 1 / 60;
-    let best = null;
+    const app = window.app, dt = 1 / 60;
+    app.setup = { mode: 'quick', trackId: s.track, laps: 5, aiCount: s.aiCount, difficulty: 3,
+      players: [{ name: 'You', carId: s.car, colorIndex: s.colorIndex, control: 'wasd' }, { name: 'P2', carId: 'hornet', colorIndex: 1, control: 'arrows' }] };
+    let r, hero;
+    const start = () => {
+      window.__reseed(s.seed);
+      app.startQuickRace('quick');
+      app.paused = true;
+      r = app.race; hero = r.players[0];
+      hero.autopilot = true; hero.aiSkill = 1.0;
+      // pole position: swap the hero with the car at the front of the grid
+      const pole = r.cars.reduce((a, c) => (c.progress > a.progress ? c : a), r.cars[0]);
+      if (pole !== hero) {
+        const a = { x: hero.pos.x, y: hero.pos.y - 0.12, z: hero.pos.z, h: hero.heading, idx: hero.trackIdx, pr: hero.progress };
+        hero.place(pole.pos.x, pole.pos.z, pole.heading, pole.pos.y - 0.12); hero.trackIdx = pole.trackIdx; hero.progress = pole.progress;
+        pole.place(a.x, a.z, a.h, a.y); pole.trackIdx = a.idx; pole.progress = a.pr;
+      }
+    };
+    // a good moment: the hero leads, settled at speed, with rivals close behind it and nothing between
+    // it and the camera (which stands ahead of it on its right-hand side)
     const score = () => {
-      const f = hero.forward, rx = f.z, rz = -f.x;
-      let n = 0, near = 0;
+      const f = hero.forward, lx = f.z, lz = -f.x;
+      let behind = 0, close = 0, blocked = 0;
       for (const c of r.cars) {
         if (c === hero) continue;
         const dx = c.pos.x - hero.pos.x, dz = c.pos.z - hero.pos.z;
-        const d = dx * f.x + dz * f.z, lat = dx * rx + dz * rz;
-        if (d < -4 && d > -28 && Math.abs(lat) < 9) { n++; near = Math.max(near, -d < 12 ? 1 : 0); }
-        if (d >= -4 && d < 25 && Math.abs(lat) < 9) n -= 2;   // a car beside or ahead would block the view
+        const d = dx * f.x + dz * f.z, lat = dx * lx + dz * lz;   // lat > 0: to the hero's left
+        if (d < -3 && d > -32 && Math.abs(lat) < 11) { behind++; if (d > -14) close = 1; }
+        if (d > 2 && d < 40 && Math.abs(lat) < 14) blocked++;                // ahead of the hero
+        if (d >= -6 && d <= 2 && lat < -1.5) blocked++;                      // alongside, on the camera's side
       }
-      // ...and the hero settled on the road at speed (not mid-crash or over a crest)
-      const calm = Math.abs(hero.pitch) < 0.03 && Math.abs(hero.slide || 0) < 0.15 && !hero.spinTime;
-      return n + near + (hero.offroad ? -5 : 0) + (hero.speed > 30 ? 1 : -3) + (calm ? 0 : -4);
+      const calm = Math.abs(hero.pitch) < 0.03 && Math.abs(hero.slide || 0) < 0.15 && !hero.spinTime && !hero.offroad;
+      if (blocked || !calm || hero.speed < 28) return -1;
+      return Math.min(behind, 4) + close;
     };
-    for (let t = 0; r.time < s.maxTime && t < 6000; t++) {
-      r.update(dt);
-      if (r.state !== 'racing' || r.time < s.minTime || t % 15) continue;
-      const sc = score();
-      if (!best || sc > best.sc) best = { sc, t: r.time };
-      if (sc >= 4) break;
+    let best = { sc: -Infinity, step: 0 };
+    if (s.at !== null) best.step = Math.round((s.at + 3.9) / dt);   // the countdown is 3.9 s
+    else {
+      start();
+      for (let step = 1; step * dt < s.maxTime + 3.9; step++) {
+        r.update(dt);
+        if (r.state !== 'racing' || r.time < s.minTime || step % 6) continue;
+        const sc = score();
+        if (sc > best.sc) best = { sc, step };
+        if (sc >= s.want) break;
+      }
     }
+    start();
+    for (let step = 1; step <= best.step; step++) r.update(dt);
     return { time: r.time, score: score(), speed: hero.speed, rank: hero.rank };
   }, SCENE);
   log('moment:', JSON.stringify(moment));
@@ -122,20 +142,51 @@ async function render() {
     const cv = COVERS[name];
     await page.setViewportSize({ width: cv.w, height: cv.h });
     await sleep(500);
-    await page.evaluate(({ c, w, h }) => {
-      const r = window.app.race, hero = r.players[0], cam = r.cameras[0];
+    const info = await page.evaluate(({ c, w, h, shutter, samples }) => {
+      const app = window.app, r = app.race, hero = r.players[0], cam = r.cameras[0];
       r.resize();
-      const hd = hero.heading, fx = Math.sin(hd), fz = Math.cos(hd), rx = Math.cos(hd), rz = -Math.sin(hd);
-      const S = r.track.samples, n = S.length;
-      const s = S[(hero.trackIdx + Math.round(c.ahead / r.track.spacing)) % n];
-      cam.position.set(s.p.x + s.n.x * s.hw * c.lat, s.p.y + c.up, s.p.z + s.n.z * s.hw * c.lat);
-      const o = c.look;
-      cam.lookAt(hero.pos.x + fx * o.fwd + rx * o.side, hero.pos.y + o.up, hero.pos.z + fz * o.fwd + rz * o.side);
-      cam.fov = c.fov; cam.aspect = w / h;
-      cam.setViewOffset(w, h, -c.shift[0] * w, -c.shift[1] * h, w, h);   // shift > 0: subject right / down
-      cam.updateProjectionMatrix();
-    }, { c: cv.cam, w: cv.w, h: cv.h });
-    await sleep(2500);   // a few frames at this size so shadows / streaming settle
+      // the hero's frame: forward f, left l (the track's normal points left too), up
+      const frame = () => { const hd = hero.heading; return { f: [Math.sin(hd), Math.cos(hd)], l: [Math.cos(hd), -Math.sin(hd)] }; };
+      const toWorld = (o) => { const { f, l } = frame(); return [hero.pos.x + f[0] * o.fwd + l[0] * o.left, hero.pos.y + o.up, hero.pos.z + f[1] * o.fwd + l[1] * o.left]; };
+      // where the camera stands: on the track ahead of the car; then held fixed relative to the car
+      const S = r.track.samples, s = S[(hero.trackIdx + Math.round(c.ahead / r.track.spacing)) % S.length];
+      const wp = [s.p.x + s.n.x * s.hw * c.lat, s.p.y + c.up, s.p.z + s.n.z * s.hw * c.lat];
+      const { f, l } = frame(), dx = wp[0] - hero.pos.x, dz = wp[2] - hero.pos.z;
+      const rig = { fwd: dx * f[0] + dz * f[1], left: dx * l[0] + dz * l[1], up: wp[1] - hero.pos.y };
+      const aim = () => {
+        cam.position.set(...toWorld(rig));
+        cam.up.set(0, 1, 0);
+        cam.lookAt(...toWorld(c.look));
+        cam.rotateZ((c.roll || 0) * Math.PI / 180);   // a little dutch angle
+        cam.fov = c.fov; cam.aspect = w / h;
+        cam.setViewOffset(w, h, -c.shift[0] * w, -c.shift[1] * h, w, h);   // shift > 0: subject right / down
+        cam.updateProjectionMatrix();
+        cam.updateMatrixWorld();
+      };
+      // motion blur: average frames over a short shutter with the camera locked to the car, so the
+      // car stays sharp and the world streaks past (a panning shot)
+      const gl = app.renderer.domElement, W = gl.width, H = gl.height;
+      const cv2 = document.createElement('canvas'); cv2.width = W; cv2.height = H;
+      const ctx = cv2.getContext('2d', { willReadFrequently: true });
+      const acc = new Float32Array(W * H * 4);
+      for (let k = 0; k < samples; k++) {
+        if (k > 0) r.update(shutter / samples);
+        aim();
+        r.render();
+        ctx.drawImage(gl, 0, 0);
+        const d = ctx.getImageData(0, 0, W, H).data;
+        for (let i = 0; i < d.length; i++) acc[i] += d[i];
+      }
+      const out = ctx.createImageData(W, H);
+      for (let i = 0; i < acc.length; i++) out.data[i] = Math.round(acc[i] / samples);
+      ctx.putImageData(out, 0, 0);
+      cv2.id = 'cover-shot';
+      cv2.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:99999';
+      document.getElementById('cover-shot')?.remove();
+      document.body.appendChild(cv2);
+      return { rig, W, H, speed: hero.speed };
+    }, { c: cv.cam, w: cv.w, h: cv.h, shutter: SHUTTER, samples: SAMPLES });
+    log(name, JSON.stringify(info));
     const file = join(WORK, `${name}.png`);
     await page.screenshot({ path: file });
     log('rendered', file);

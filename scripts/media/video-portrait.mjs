@@ -45,14 +45,27 @@ function initScript(save) {
   const q = new Map(); let nid = 0;
   window.requestAnimationFrame = (cb) => { q.set(++nid, cb); return nid; };
   window.cancelAnimationFrame = (id) => { q.delete(id); };
+  // setTimeout runs on the same clock (the HUD hides "GO!" and toasts with timers)
+  const realSetInterval = window.setInterval.bind(window);
+  const timers = new Map(); let tid = 0;
+  window.setTimeout = (fn, ms = 0, ...a) => { timers.set(++tid, { due: t + (+ms || 0), fn, a }); return tid; };
+  window.clearTimeout = (id) => { timers.delete(id); };
+  const runTimers = () => {
+    for (let guard = 0; guard < 50; guard++) {
+      const due = [...timers].filter(([, x]) => x.due <= t).sort((a, b) => a[1].due - b[1].due);
+      if (!due.length) return;
+      for (const [id, x] of due) { timers.delete(id); try { typeof x.fn === 'function' ? x.fn(...x.a) : 0; } catch (e) { console.error('timer', e && e.stack || e); } }
+    }
+  };
   window.__auto = true;   // free-running while the game boots; stepped by hand while recording
   window.__tick = (ms) => {
     t += ms;
+    runTimers();
     const l = [...q.values()]; q.clear();
     for (const cb of l) { try { cb(t); } catch (e) { console.error('rAF', e && e.stack || e); } }
   };
   window.__steps = (n) => { for (let i = 0; i < n; i++) window.__tick(1000 / 30); };
-  setInterval(() => { if (window.__auto) window.__tick(1000 / 30); }, 20);
+  realSetInterval(() => { if (window.__auto) window.__tick(1000 / 30); else runTimers(); }, 20);
   let s = 20261121;
   Math.random = () => { s |= 0; s = (s + 0x6D2B79F5) | 0; let x = Math.imul(s ^ (s >>> 15), 1 | s); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
   try { localStorage.clear(); localStorage.setItem('turbotour.save.v1', save); } catch (e) { /* */ }
@@ -63,11 +76,8 @@ const HUD_CSS = `
   .hz-hint, .hz-mapbtn, #touch-ui, .touch-controls { display: none !important; }
 `;
 
-let frameNo = 0;
-async function shoot(page, dir) {
-  const f = join(dir, `f${String(frameNo++).padStart(4, '0')}.png`);
-  await page.screenshot({ path: f, animations: 'allow', caret: 'hide' });
-  return f;
+async function shoot(page, file) {
+  await page.screenshot({ path: file, animations: 'allow', caret: 'hide' });
 }
 const step = (page, n = 1) => page.evaluate((n) => window.__steps(n), n);
 /** Simulate without rendering (fast-forward). */
@@ -78,13 +88,15 @@ async function warm(page, n) {
     try { window.__steps(n); } finally { r.render = orig; }
   }, n);
 }
+/** Step and screenshot n frames into dir (PROBE: every 10th frame only). `perFrame(i)` runs in the page before each step. */
 async function record(page, dir, n, perFrame) {
+  mkdirSync(dir, { recursive: true });
   const t0 = Date.now();
   for (let i = 0; i < n; i++) {
     if (perFrame) await page.evaluate(perFrame, i);
     await step(page, 1);
-    await shoot(page, dir);
-    if (i % 30 === 0) process.stdout.write(`  frame ${frameNo} (${((Date.now() - t0) / (i + 1) / 1000).toFixed(2)} s/frame)\n`);
+    if (!PROBE || i % 10 === 0) await shoot(page, join(dir, `f${String(i).padStart(4, '0')}.png`));
+    if (i % 30 === 29) console.log(`  ${i + 1}/${n} (${((Date.now() - t0) / (i + 1) / 1000).toFixed(2)} s/frame)`);
   }
 }
 
@@ -117,20 +129,130 @@ async function startRace(page, { track, ai, car, laps = 3, difficulty = 3, after
   if (afterGo > 0) await warm(page, Math.round(afterGo * FPS));
 }
 
-async function shotRace(page, dir, n) {
-  await startRace(page, { track: 'coastal', ai: 7, car: 'super', afterGo: 2.5 });
-  await record(page, dir, n);
+const SHOTS = {
+  // 1. Pack racing: Azure Coast, seven Dynamic AI cars, the player (on autopilot) in the pack just after the start.
+  race: { frames: 150, async setup(page) { await startRace(page, { track: 'coastal', ai: 7, car: 'super', afterGo: +opt('after', 0.6) }); } },
+
+  // 2. Drift: Mesa Verde Dash, a handbrake flick into the long right-hander after the first straight,
+  //    held on the throttle (steering into the slide, as a player does), then caught and driven out.
+  drift: {
+    frames: 120,
+    async setup(page) {
+      await startRace(page, { track: 'desert', ai: 7, car: 'super' });
+      await page.evaluate(installDrift, { start: 252, end: 366, kickAt: 250, kickT: 0.35, holdK: 0.6, thr: 0.6, vT: 130, outMax: +opt('outmax', 0.42), lead: +opt('lead', 20) });
+      // drive (autopilot) up the straight until shortly before the corner
+      await page.evaluate(() => { const r = window.app.renderer, o = r.render; r.render = () => {}; const c = window.app.race.players[0]; let n = 0; while (!(c.lap >= 1 && c.trackIdx >= window.__driftCfg.from && c.trackIdx < window.__driftCfg.end) && n++ < 3000) { window.__driftStep(); window.__steps(1); } r.render = o; });
+    },
+    perFrame: () => window.__driftStep(),
+  },
+
+  // 3. Free Roam: Turbo Blvd through Turbo City with ambient traffic.
+  roam: {
+    frames: 180,
+    async setup(page) {
+      await page.evaluate(installRoam, { road: opt('road', 'st-ns2'), li: +opt('li', 40), dir: 1, vT: +opt('vt', 27) });
+      await page.evaluate((n) => { const r = window.app.renderer, o = r.render; r.render = () => {}; for (let i = 0; i < n; i++) { window.__roamStep(); window.__steps(1); } r.render = o; }, Math.round(+opt('roamwarm', 4) * FPS));
+    },
+    perFrame: () => window.__roamStep(),
+  },
+};
+
+/** In the page: a drift controller for player 1 (inputs as a player would give them). */
+async function installDrift(cfg) {
+  const { driveAI } = await import('./src/ai.js');
+  const app = window.app, race = app.race, car = race.players[0];
+  window.__driftCfg = { ...cfg, from: cfg.kickAt - cfg.lead };
+  const orig = app.input.read.bind(app.input);
+  app.input.read = (s, p, i) => { const r = orig(s, p, i); return i === 0 && window.__ctl ? { ...r, ...window.__ctl } : r; };
+  const D = { phase: 'approach', t: 0, s: 1 };
+  window.__driftStep = () => {
+    const tr = race.track, idx = car.trackIdx;
+    if (D.phase === 'approach' && idx >= cfg.kickAt && idx < cfg.end) { D.phase = 'kick'; D.t = 0; D.s = -Math.sign(tr.samples[cfg.start + 10].curv); car.autopilot = false; }
+    D.t += 1 / 30;
+    if (D.phase === 'approach' || D.phase === 'done') { car.autopilot = true; window.__ctl = null; return; }
+    driveAI(car, { track: tr, cars: race.cars, live: true, bestPlayerProgress: null, time: race.time, dynamic: race.dynamic }, 1 / 30);
+    const ai = { ...car.input };
+    if (D.phase === 'kick') {
+      window.__ctl = { throttle: cfg.thr, brake: 0, steer: D.s, handbrake: true };
+      if (D.t > cfg.kickT) { D.phase = 'hold'; D.t = 0; }
+    } else {
+      const lat = tr.lateral(car.pos, idx), hw = tr.samples[idx].hw;
+      const st = D.s * Math.max(0.3, Math.min(1, cfg.holdK + 0.6 * D.s * ai.steer));
+      window.__ctl = { throttle: car.speed > cfg.vT / 3.6 ? 0.25 : 1, brake: 0, steer: st, handbrake: false };
+      if (idx >= cfg.end - 8 || D.t > 3.5 || -D.s * lat > cfg.outMax * hw) { D.phase = 'done'; car.autopilot = true; window.__ctl = null; }
+    }
+  };
+}
+
+/** In the page: start Free Roam on a road and drive it like a player (keyboard-style inputs), passing traffic. */
+async function installRoam(cfg) {
+  const { snapChaseCamera } = await import('./src/scenekit.js');
+  const app = window.app;
+  app.startHorizon();
+  window.__auto = false;
+  const hz = app.horizon, W = hz.world, car = hz.car;
+  const road = W.getRoad(cfg.road);
+  hz.placeAt(road.i0 + cfg.li);
+  if (cfg.dir < 0) { car.place(car.pos.x, car.pos.z, car.heading + Math.PI, car.pos.y); }
+  car.vf = cfg.vT;
+  snapChaseCamera(hz.camera, car, hz.tmp2);
+  const ctl = { throttle: 0, brake: 0, steer: 0, handbrake: false };
+  const orig = app.input.read.bind(app.input);
+  app.input.read = (s, p, i) => { const r = orig(s, p, i); return i === 0 ? { ...r, ...ctl } : r; };
+  const wrapA = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+  let li = cfg.li, laneOff = 0;
+  window.__roam = { road: cfg.road };
+  window.__roamStep = () => {
+    // nearest sample on our road, searched around the last one
+    let best = li, bd = Infinity;
+    for (let k = -8; k <= 12; k++) { const j = Math.max(0, Math.min(road.n - 1, li + k)), q = W.samples[road.i0 + j].p; const d = (q.x - car.pos.x) ** 2 + (q.z - car.pos.z) ** 2; if (d < bd) { bd = d; best = j; } }
+    li = best;
+    const v = car.speed, dir = cfg.dir;
+    const look = Math.max(10, Math.min(40, 8 + v * 0.55));
+    const s = W.samples[road.i0 + Math.max(0, Math.min(road.n - 1, li + dir * Math.round(look / W.spacing)))];
+    const hw = road.width / 2;
+    // keep right, move out to pass traffic ahead in our lane
+    let lane = -dir * hw * 0.32;
+    const fx = Math.sin(car.heading), fz = Math.cos(car.heading), rx = -fz, rz = fx;
+    let slow = 0;
+    for (const t of hz.traffic.cars) {
+      const dx = t.pos.x - car.pos.x, dz = t.pos.z - car.pos.z;
+      const fwd = dx * fx + dz * fz, side = dx * rx + dz * rz;
+      const own = Math.abs(t.heading - car.heading) < 1.2 || Math.abs(t.heading - car.heading) > 5.1;   // same direction
+      if (own && fwd > 0 && fwd < 50 && Math.abs(side - (-laneOff)) < 3.4) lane = dir * hw * 0.22;   // pull out to pass
+      if (fwd > 0 && fwd < 12 && Math.abs(side) < 2.4) slow = 1;
+    }
+    laneOff += (lane - laneOff) * 0.06;
+    const tx = s.p.x + s.n.x * laneOff, tz = s.p.z + s.n.z * laneOff;
+    const diff = wrapA(Math.atan2(tx - car.pos.x, tz - car.pos.z) - car.heading);
+    ctl.steer = Math.max(-1, Math.min(1, -diff * 2.4));
+    const curv = W.maxCurvatureAhead(road.i0 + li, 18 + v * 1.4);
+    const vT = Math.min(cfg.vT, Math.sqrt(car.stats.grip * 2.6 * 0.8 / Math.max(curv, 0.0004)));
+    ctl.throttle = v < vT && !slow ? 1 : 0;
+    ctl.brake = v > vT + 2 || slow ? 0.5 : 0;
+    window.__roam.li = li;
+  };
+}
+
+async function runShot(page, name, n) {
+  const sh = SHOTS[name];
+  await sh.setup(page);
+  await record(page, join(OUT, name), n ?? sh.frames, sh.perFrame);
 }
 
 async function main() {
-  if (existsSync(OUT) && !PROBE) rmSync(OUT, { recursive: true, force: true });
-  mkdirSync(OUT, { recursive: true });
+    mkdirSync(OUT, { recursive: true });
   const srv = await serve(ROOT, PORT);
   const browser = await chromium.launch();
   try {
-    const { ctx, page } = await newPage(browser, srv.url);
-    if (ONLY.includes('race')) { console.log('race'); await shotRace(page, OUT, PROBE ? 4 : 165); }
-    await ctx.close();
+    for (const name of ONLY) {
+      if (!SHOTS[name]) continue;
+      console.log('shot', name);
+      rmSync(join(OUT, name), { recursive: true, force: true });
+      const { ctx, page } = await newPage(browser, srv.url);
+      await runShot(page, name, opt('frames') ? +opt('frames') : undefined);
+      await ctx.close();
+    }
   } finally {
     await browser.close();
     srv.stop();
@@ -139,4 +261,4 @@ async function main() {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch((e) => { console.error(e); process.exit(1); });
 
-export { newPage, startRace, warm, step, shoot, record, serve, chromium, ROOT, PORT };
+export { installRoam, installDrift, newPage, startRace, warm, step, shoot, record, serve, chromium, ROOT, PORT };
