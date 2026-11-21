@@ -1,9 +1,9 @@
-// Portrait (2:3) CrazyGames preview video: 1080x1620, H.264, 30 fps, 16.5 s, silent.
+// Portrait (2:3) CrazyGames preview video: 1080x1620, H.264, 30 fps, 17.8 s, silent.
 //
-//   node scripts/media/video-portrait.mjs [framesDir] [--only=race,drift,roam] [--no-encode] [--probe [--every=N]]
+//   node scripts/media/video-portrait.mjs [framesDir] [--only=race,drift,neon,roam] [--no-encode] [--probe [--every=N]]
 //
-// Shots (hard cuts): race (Azure Coast pack start, 4 s), drift (Mesa Verde Dash, 4.7 s), roam (Free Roam
-// into Turbo City with traffic, 6.3 s, ending on a 1.5 s TURBO TOUR card). --only re-renders some shots and
+// Shots (hard cuts): race (Azure Coast pack start, 4 s), drift (Mesa Verde Dash, 3.2 s), neon (Neon City
+// Nights, 2.8 s), roam (Free Roam into Turbo City with traffic, 6.3 s, ending on a 1.5 s TURBO TOUR card). --only re-renders some shots and
 // re-encodes from the frames already in framesDir; --probe only screenshots every Nth frame and skips encoding.
 // Takes ~6-8 minutes (about 0.6 s per frame with SwiftShader).
 //
@@ -24,7 +24,7 @@ const args = process.argv.slice(2);
 const flag = (n) => args.includes('--' + n);
 const opt = (n, d) => { const a = args.find((x) => x.startsWith(`--${n}=`)); return a ? a.split('=')[1] : d; };
 const OUT = resolve(args.find((a) => !a.startsWith('--')) || join(tmpdir(), 'turbotour-video-portrait'));
-const ORDER = ['race', 'drift', 'roam'];
+const ORDER = ['race', 'drift', 'neon', 'roam'];
 const ONLY = opt('only', ORDER.join(',')).split(',');
 const PROBE = flag('probe');
 const PORT = 8603;
@@ -78,7 +78,8 @@ function initScript(save) {
   try { localStorage.clear(); localStorage.setItem('turbotour.save.v1', save); } catch (e) { /* */ }
 }
 
-// HUD: injected CSS only (see report). Empty until the portrait layout has been checked.
+// The race and Free Roam HUDs lay out cleanly at 540x810 CSS px (2:3), so they stay. Only the keyboard-hint line and the
+// MAP button of the Free Roam HUD (and any touch controls) are hidden; the end card fades the HUD out.
 const HUD_CSS = `
   .hz-hint, .hz-mapbtn, #touch-ui, .touch-controls { display: none !important; }
 `;
@@ -146,7 +147,7 @@ const SHOTS = {
   // 2. Drift: Mesa Verde Dash, a handbrake flick into the long right-hander after the first straight,
   //    held on the throttle (steering into the slide, as a player does), then caught and driven out.
   drift: {
-    frames: 141,
+    frames: 96,
     async setup(page) {
       await startRace(page, { track: 'desert', ai: 7, car: 'super' });
       await page.evaluate(installDrift, DRIFT_CFG);
@@ -156,7 +157,10 @@ const SHOTS = {
     perFrame: () => window.__driftStep(),
   },
 
-  // 3. Free Roam: North Gate Rd into Turbo City with ambient traffic (oncoming cars, an overtake, a near miss),
+  // 3. Night racing: Neon City Nights, chasing the cars ahead through the skyline a few seconds into the race.
+  neon: { frames: 84, async setup(page) { await startRace(page, { track: 'neon', ai: 7, car: 'super', afterGo: +opt('neonafter', 6.67) }); } },
+
+  // 4. Free Roam: North Gate Rd into Turbo City with ambient traffic (oncoming cars, an overtake, a near miss),
   //    then the TURBO TOUR end card fading in over the still-running game.
   roam: {
     frames: ROAM_FRAMES + LOGO_FRAMES,
