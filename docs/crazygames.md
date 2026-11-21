@@ -137,8 +137,15 @@ To add another portal, add one entry to `TARGETS` in `scripts/build.mjs` and one
   - Esc to pause
   - Gamepads supported; touch controls on mobile
 - [ ] **Category / tags:** Driving, Racing (open world, drift, 3D, 2 player).
-- [ ] **Covers:** landscape, portrait and square images at the sizes the upload form asks for, without any
-  other portal's branding.
-- [ ] **Preview videos:** landscape and portrait gameplay clips at the lengths and sizes the form asks for.
+- [ ] **Covers** (in `media/covers/`, made from real renders of the game by `scripts/media/`), with no other
+  portal's branding:
+  - landscape 16:9, 1920×1080: `media/covers/landscape-1920x1080.png`
+  - portrait 2:3, 800×1200: `media/covers/portrait-800x1200.png`
+  - square 1:1, 800×800: `media/covers/square-800x800.png`
+- [ ] **Preview videos** (in `media/video/`): 15–20 s of real gameplay (longer clips are cut at 20 s), at most
+  50 MB each, H.264 MP4:
+  - landscape 16:9, 1920×1080: `media/video/landscape-1920x1080.mp4`
+  - portrait 2:3, 1080×1620: `media/video/portrait-1080x1620.mp4` (2:3 like the portrait cover; the
+    uploader has been reported to reject 9:16 portrait clips)
 - [ ] **Devices:** desktop and mobile. Split Screen is hidden on phones.
 - [ ] **Age rating / content:** no violence, chat, user-generated content or purchases.
