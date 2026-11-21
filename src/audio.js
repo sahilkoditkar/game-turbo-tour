@@ -12,7 +12,8 @@ export class AudioSystem {
     this.crowd = new Map();   // car key -> engine voice, for the nearest other cars
     this.spare = [];          // crowd voices not in use (silent, kept for reuse)
     this.volume = 0.7;
-    this.enabled = true;
+    this.enabled = true;   // the player's Sound on/off setting
+    this.forcedMute = false; // the portal asks for silence (an ad break, CrazyGames settings.muteAudio)
   }
 
   init() {
@@ -20,13 +21,16 @@ export class AudioSystem {
     try {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
       this.master = this.ctx.createGain();
-      this.master.gain.value = this.volume;
+      this.master.gain.value = this._gain();
       this.master.connect(this.ctx.destination);
     } catch (e) { this.ctx = null; }
   }
 
-  setVolume(v) { this.volume = v; if (this.master) this.master.gain.value = this.enabled ? v : 0; }
+  _gain() { return this.enabled && !this.forcedMute ? this.volume : 0; }
+  setVolume(v) { this.volume = v; if (this.master) this.master.gain.value = this._gain(); }
   setEnabled(on) { this.enabled = on; this.setVolume(this.volume); }
+  /** Portal mute: wins over the player's settings without changing them; lifting it restores them. */
+  setForcedMute(m) { this.forcedMute = !!m; this.setVolume(this.volume); }
 
   /** One second of white noise, made once. */
   _noiseBuffer() {

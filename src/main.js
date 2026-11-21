@@ -13,11 +13,15 @@ import {
   loadProfile, saveProfile, resetProfile, seriesState, seriesField, quickField, playerStats,
   applyCareerResult, restartSeries, buyCar, buyUpgrade, recordBestLap, paintOf,
 } from './career.js';
+import { platform } from './platform/index.js';
+import { breakActive, onForcedMute, noteRunEnd } from './adbreak.js';
 
 // The static About section in index.html is for crawlers and no-JS visitors; with JS running it
 // lives behind the main menu's "About Turbo Tour" button (UI.openAbout).
 document.getElementById('about')?.classList.add('hidden');
 
+// Ghost laps stay in this device's localStorage on every platform: one can be several hundred KB, too big
+// for a portal's save quota (the career save goes through the platform storage facade, see career.js).
 const GHOST_PREFIX = 'turbotour.ghost.';
 const OLD_GHOST_PREFIX = 'apexrush.ghost.';
 // one-time copy of pre-rename ghosts to the new prefix
@@ -62,6 +66,7 @@ class App {
     this.profile = loadProfile();
     this.audio.setVolume(this.profile.settings.volume);
     this.audio.setEnabled(this.profile.settings.sound);
+    onForcedMute((m) => this.audio.setForcedMute(m)); // ad breaks and the portal's mute; the player's settings come back after
     this.input.setTouchPrefs(this.profile.settings.touch);
     this._initTouchScreen();
     this.ui = new UI(this);
@@ -82,6 +87,7 @@ class App {
 
     this._buildIdleScene();
     this.ui.mainMenu();
+    platform.loadingStop();
     document.getElementById('loading').style.opacity = '0';
     setTimeout(() => document.getElementById('loading').remove(), 450);
     this.renderer.setAnimationLoop(() => this.frame());
@@ -199,7 +205,17 @@ class App {
     }
   }
 
+  /** Is the player driving right now? (Not in a countdown, on a results screen, a menu, the map or a garage.)
+   * Edges become the portal's gameplayStart / gameplayStop; the platform layer ignores repeats. */
+  _isPlaying() {
+    if (this.paused || this.garage3d || this.ui.mapOpen || this.ui.worldPanelClose) return false;
+    if (this.race) return this.race.state === 'racing';
+    return !!this.horizon;
+  }
+
   frame() {
+    // an ad break freezes the game (simulation, sound, render); the clock is reset so no time passes
+    if (breakActive()) { this.clock.getDelta(); this.input.endFrame(); return; }
     const dt = Math.min(this.clock.getDelta(), 0.1);
     if (this.race || this.horizon) {
       this._touchGuard();
@@ -230,6 +246,7 @@ class App {
       this.idle.camera.lookAt(wide ? -6 : 0, 0.5, 0);
       this.renderer.render(this.idle.scene, this.idle.camera);
     }
+    if (this._isPlaying()) platform.gameplayStart(); else platform.gameplayStop();
     this.input.endFrame();
   }
 
@@ -338,9 +355,10 @@ class App {
       renderer: this.renderer, input: this.input, audio: this.audio, profile: this.profile, quality: this.profile.settings.quality,
       onEvent: (marker) => this.onWorldMarker(marker),
       onSave: () => this.save(),
-      onLevel: () => this._refreshIdleCars(),
+      onLevel: () => { this._refreshIdleCars(); platform.happytime(); },
     });
     this.paused = false;
+    platform.loadingStop(); // opened by UI._launchHorizon while "Building the world…" shows
   }
 
   /** Drive-up event inside Free Roam: run the circuit as a race, then return to the world. */
@@ -452,6 +470,10 @@ class App {
       ctx.horizonReward = { credits, xp };
       this.save();
     }
+    noteRunEnd();
+    // a moment worth celebrating: a solo win against a field, a championship title, a new best in time trial
+    const solo = results.filter(r => r.isPlayer).length === 1;
+    if (me && solo && ((me.rank === 1 && results.length > 1) || (ctx.career && ctx.career.seriesComplete && ctx.career.finalRank === 1) || (ctx.mode === 'timetrial' && ctx.newBest))) platform.happytime();
     document.getElementById('hud-layer').classList.add('hidden');
     this.ui.results(results, ctx);
   }

@@ -41,6 +41,7 @@
     { "imports": { "three": "./vendor/three.module.js" } }
   </script>
   <link rel="modulepreload" href="./vendor/three.module.js" />
+  <link rel="modulepreload" href="./src/boot.js" />
   <link rel="modulepreload" href="./src/main.js" />
   <script type="application/ld+json">
   {
@@ -138,7 +139,7 @@
       <p>On phones and tablets, touch controls appear automatically, with four layouts to choose from: slide your thumb to steer, an on-screen steering wheel, tilt (gyro) steering, or two-thumb left/right buttons with a gear lever that drives the car for you. Play with the phone sideways; the game goes full screen when you start driving.</p>
 
       <h3>FAQ</h3>
-      <details>
+      <details data-web-only>
         <summary>Is Turbo Tour free?</summary>
         <p>Yes. The whole game is free to play, with no ads, no in-app purchases and no account.</p>
       </details>
@@ -154,16 +155,16 @@
         <summary>Can two people play?</summary>
         <p>Yes, on a computer or a tablet. Split Screen mode lets two players race on one screen: Player 1 uses WASD, Player 2 the arrow keys, or each player uses a gamepad. It isn't offered on phones, where the screen is too small to share.</p>
       </details>
-      <details>
+      <details data-web-only>
         <summary>Where is my progress saved?</summary>
         <p>In your browser's local storage on this device. Nothing is uploaded. Clearing site data or using a private window starts a fresh career.</p>
       </details>
 
-      <p class="about-links">Turbo Tour is open source: <a href="https://github.com/sahilkoditkar/game-turbo-tour">view the code on GitHub</a> ·
+      <p class="about-links" data-web-only>Turbo Tour is open source: <a href="https://github.com/sahilkoditkar/game-turbo-tour">view the code on GitHub</a> ·
       <a href="./showroom.html">Open the car showroom</a></p>
     </div>
   </section>
 
-  <script type="module" src="./src/main.js"></script>
+  <script type="module" src="./src/boot.js"></script>
 </body>
 </html>

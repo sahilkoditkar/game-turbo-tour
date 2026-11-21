@@ -1,5 +1,6 @@
 import { CARS, SERIES, UPGRADES, AI_DRIVERS, AI_COLORS, POINTS, RETIRED_CARS, PAINT_COST, upgradeCost, effectiveStats, getCar, getSeries } from './data.js';
 import { levelForXp } from './worlddef.js';
+import { storage, localStore } from './platform/index.js'; // localStorage on the web, the portal's save API elsewhere
 
 const KEY = 'turbotour.save.v1';
 const OLD_KEY = 'apexrush.save.v1'; // pre-rename save, migrated once on load
@@ -26,11 +27,11 @@ export function defaultHorizon() {
 
 export function loadProfile() {
   try {
-    if (localStorage.getItem(KEY) === null) {
-      const old = localStorage.getItem(OLD_KEY);
-      if (old !== null) localStorage.setItem(KEY, old);
+    if (storage.getItem(KEY) === null) {
+      const old = localStore.getItem(OLD_KEY);
+      if (old !== null) storage.setItem(KEY, old);
     }
-    const raw = localStorage.getItem(KEY);
+    const raw = storage.getItem(KEY);
     if (!raw) return defaultProfile();
     const p = JSON.parse(raw);
     const d = defaultProfile();
@@ -64,10 +65,10 @@ function migrateCars(p) {
 }
 
 export function saveProfile(p) {
-  try { localStorage.setItem(KEY, JSON.stringify(p)); } catch (e) { /* storage unavailable */ }
+  try { storage.setItem(KEY, JSON.stringify(p)); } catch (e) { /* storage unavailable */ }
 }
 
-export function resetProfile() { try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ } return defaultProfile(); }
+export function resetProfile() { try { storage.removeItem(KEY); } catch (e) { /* ignore */ } return defaultProfile(); }
 
 export function seriesState(profile, id) {
   if (!profile.series[id]) profile.series[id] = { event: 0, points: {}, complete: false, finalRank: null, results: [] };

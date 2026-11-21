@@ -136,6 +136,16 @@ This game is live at https://sahilkoditkar.github.io/game-turbo-tour/ (in genera
 `https://<user>.github.io/<repo>/`). All asset paths are relative,
 so it works from a project sub-path as well as from a custom domain.
 
+## Game portals (CrazyGames)
+
+The same code runs on GitHub Pages and on game portals. `src/platform/index.js` is the only portal-facing
+module the game imports: it picks an adapter at boot (`web` by default; a portal build sets
+`window.TURBOTOUR_PLATFORM`, and `?platform=` works for testing) that handles loading and gameplay events,
+mid-game ads at natural breaks (leaving a results screen), the portal's mute and saves. On GitHub Pages every
+call does nothing and no SDK is loaded. Portal zips are built with `node scripts/build.mjs crazygames` (or
+`web`) into `dist/`; see [docs/crazygames.md](docs/crazygames.md) for the CrazyGames build, the headless tests
+in `tests/`, local testing and submission.
+
 ## Controls
 
 | Action            | Player 1        | Player 2                | Gamepad            |
@@ -180,7 +190,13 @@ career screen or in *Settings*.
 index.html            entry page, import map, HUD/menu containers
 style.css             menus and HUD styling
 vendor/three.module.js vendored Three.js (r170) so no CDN is needed
+src/boot.js           entry point: starts the platform layer, then main.js
 src/main.js           app state machine, render loop, race lifecycle
+src/platform/         portal adapters (web, crazygames), pacing numbers (policy.js), iframe behaviour (embed.js)
+src/adbreak.js        what the game does around a portal ad break (freeze, mute, veil, input)
+scripts/build.mjs     portal zips (node scripts/build.mjs crazygames | web) into dist/
+tests/                headless Playwright tests for the web build, the CrazyGames build and iframe embedding
+docs/crazygames.md    CrazyGames integration, testing and submission notes
 src/race.js           race manager: physics loop, collisions, laps, ranking, split-screen rendering
 src/car.js            car physics
 src/carmodels.js      the ten car models (proportions, lights, aero, liveries)

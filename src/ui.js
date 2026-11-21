@@ -5,6 +5,8 @@ import { seriesState, seriesLock, standings, canBuyUpgrade, paintOf, setPaint } 
 import { levelForXp } from './worlddef.js';
 import { fmtTime } from './race.js';
 import { WorldMap } from './worldmap.js';
+import { platform } from './platform/index.js';
+import { naturalBreak } from './adbreak.js';
 
 const hex = (c) => '#' + c.toString(16).padStart(6, '0');
 const money = (n) => `${Math.round(n).toLocaleString()} cr`;
@@ -56,6 +58,8 @@ export class UI {
     if (!about) return;
     about.classList.add('hidden');
     const panel = about.querySelector('.about-panel');
+    // statements that are only true on the plain web build (no ads, saved in this browser, links off-site)
+    if (platform.name !== 'web') about.querySelectorAll('[data-web-only]').forEach((el) => el.remove());
     const back = document.createElement('button');
     back.type = 'button'; back.className = 'small ghost about-back'; back.textContent = '← Back';
     const done = document.createElement('div');
@@ -701,6 +705,7 @@ export class UI {
 
   _launchHorizon() {
     this.show(`<div class="panel narrow" style="text-align:center"><div class="logo" style="font-size:40px">TURBO <span>TOUR</span></div><div class="tagline" style="margin:14px 0 0">Building the world…</div></div>`, { title: 'Free Roam' });
+    platform.loadingStart(); // closed at the end of App.startHorizon
     setTimeout(() => this.app.startHorizon(), 40);
   }
 
@@ -763,7 +768,8 @@ export class UI {
           <button class="primary" data-continue>${ctx.mode === 'horizon' || (ctx.mode === 'career' && app.horizon) ? 'Back to the island' : ctx.mode === 'career' ? 'Continue' : 'Main menu'}</button>
         </div>
       </div>`, { title: 'Results' });
-    this.on('[data-retry]', 'click', () => app.restartRace());
-    this.on('[data-continue]', 'click', () => app.leaveRace(ctx.mode === 'career' ? 'career' : ctx.mode === 'horizon' ? 'horizon' : 'menu'));
+    // leaving a results screen is the natural break where a portal may show a mid-game ad (see adbreak.js)
+    this.on('[data-retry]', 'click', () => naturalBreak(() => app.restartRace()));
+    this.on('[data-continue]', 'click', () => naturalBreak(() => app.leaveRace(ctx.mode === 'career' ? 'career' : ctx.mode === 'horizon' ? 'horizon' : 'menu')));
   }
 }

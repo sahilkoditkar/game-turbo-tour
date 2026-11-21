@@ -370,7 +370,9 @@ export class Input {
       this.touchEl.style.setProperty('--s', String(this._scale()));
       if (this.touchVisible) this._layoutTouch();
     });
-    window.addEventListener('deviceorientation', (e) => {
+    // tilt steering is touch-only; without a touch screen the listener is not added (inside a portal iframe that
+    // does not allow the motion sensors, adding it logs a permissions-policy error)
+    if (this.isTouchDevice) window.addEventListener('deviceorientation', (e) => {
       if (e.beta == null || e.gamma == null) return;
       this._tilt = { beta: e.beta, gamma: e.gamma };
     });
